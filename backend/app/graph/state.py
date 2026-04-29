@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 from langchain_core.documents import Document
 
@@ -23,7 +25,7 @@ class GraphState(BaseModel):
     evidence: EvidenceDecision = Field(default_factory=EvidenceDecision)
     answer: str = ""
     sources: list[Source] = Field(default_factory=list)
-    status: str = "insufficient_pdf_evidence"
+    status: Literal["answered_from_pdf", "insufficient_pdf_evidence"] = "insufficient_pdf_evidence"
     needs_external_search: bool = True
 
     model_config = {"arbitrary_types_allowed": True}

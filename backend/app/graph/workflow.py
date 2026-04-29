@@ -18,6 +18,8 @@ def assess_evidence(
         )
         state.status = "insufficient_pdf_evidence"
         state.needs_external_search = True
+        state.answer = ""
+        state.sources = []
         return state
 
     best = max(state.retrieved_documents, key=lambda item: item.score)
@@ -29,6 +31,8 @@ def assess_evidence(
         )
         state.status = "insufficient_pdf_evidence"
         state.needs_external_search = True
+        state.answer = ""
+        state.sources = []
         return state
 
     chunk_id = str(best.document.metadata["chunk_id"])
@@ -48,6 +52,9 @@ def generate_answer_from_documents(state: GraphState) -> GraphState:
         item.document for item in state.retrieved_documents
         if str(item.document.metadata.get("chunk_id")) in allowed
     ]
+    if not documents:
+        return fallback_no_answer(state)
+
     context = "\n\n".join(document.page_content for document in documents)
     state.answer = f"안내책자 기준으로 확인한 내용입니다.\n\n{context}"
     state.sources = [document_to_source(document) for document in documents]
