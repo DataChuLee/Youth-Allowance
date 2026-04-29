@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -16,5 +18,5 @@ class Source(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     sources: list[Source]
-    status: str
+    status: Literal["answered_from_pdf", "insufficient_pdf_evidence"]
     needs_external_search: bool
