@@ -24,4 +24,5 @@ def create_vector_store(settings: Settings) -> Chroma:
         collection_name=COLLECTION_NAME,
         persist_directory=str(settings.chroma_dir),
         embedding_function=embeddings,
+        create_collection_if_not_exists=False,
     )
