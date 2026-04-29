@@ -1,9 +1,11 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from app.api.routes import router
 from app.core.errors import AppError
 
 app = FastAPI(title="Youth Allowance RAG Chatbot API")
+app.include_router(router)
 
 
 @app.exception_handler(AppError)
