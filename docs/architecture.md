@@ -52,9 +52,9 @@ sequenceDiagram
     U->>F: 질문 입력
     F->>A: POST /chat
     A->>G: 질문으로 그래프 실행
-    G->>C: 관련 PDF 청크 검색
-    C-->>G: 페이지 메타데이터가 있는 청크 반환
-    G->>G: 근거 충분성 판단
+    G->>C: 관련 PDF 청크 top-k 검색
+    C-->>G: 페이지 메타데이터와 score가 있는 청크 반환
+    G->>G: score 기준 + LLM grader로 근거 충분성 판단
     alt PDF 근거 충분
         G->>O: 근거 기반 한국어 답변 생성
         O-->>G: 답변 반환
@@ -81,6 +81,17 @@ flowchart TD
 
 채팅을 안정적으로 사용하려면 먼저 indexing 명령을 실행해야 한다. Chroma 인덱스가 없으면 백엔드는 `index_missing` 오류를 명확히 반환한다.
 
+Indexing 명령은 성공 시 다음 검증 정보를 출력한다.
+
+- 전체 페이지 수.
+- 텍스트 추출 성공 페이지 수.
+- 텍스트가 비어 있는 페이지 수.
+- 전체 추출 문자 수.
+- 생성된 청크 수.
+- 샘플 청크와 해당 `page`, `chunk_id`.
+
+빈 페이지가 과도하거나 전체 추출 문자 수가 너무 작으면 indexing은 실패해야 한다. MVP는 OCR을 포함하지 않으므로 이미지 기반 PDF는 별도 OCR 전처리가 필요하다는 오류를 반환한다.
+
 ## 5. LangGraph Workflow
 
 ```mermaid
@@ -97,10 +108,32 @@ stateDiagram-v2
 ### 노드 책임
 
 - `retrieve_pdf`: Chroma에서 질문과 관련 있는 안내책자 청크를 검색한다.
-- `assess_evidence`: 검색된 청크만으로 안전하게 답변할 수 있는지 판단한다.
+- `assess_evidence`: 검색 score와 LLM grader를 함께 사용해 검색된 청크만으로 안전하게 답변할 수 있는지 판단한다.
 - `generate_answer`: 검색된 PDF 근거만 사용해 한국어 답변을 생성한다.
 - `fallback_no_answer`: 안내책자에서 답을 확인할 수 없을 때 안전한 fallback을 반환한다.
 - `official_search_extension`: 향후 공식 출처 검색을 붙이기 위한 확장 노드다. MVP에서는 비활성화한다.
+
+### 근거 충분성 판단 기준
+
+`assess_evidence`는 다음 조건을 모두 만족할 때만 `answered_from_pdf`로 라우팅한다.
+
+- `retrieve_pdf`가 최소 1개 이상의 청크를 반환한다.
+- 상위 검색 결과의 similarity score가 최소 기준 이상이다.
+- LLM evidence grader가 검색된 청크만으로 질문에 답할 수 있다고 판단한다.
+
+초기 검색 설정은 top-k 5를 기본값으로 한다. similarity threshold는 구현 시 보수적으로 설정하고, 수동 검증 질문 결과를 기준으로 조정한다.
+
+LLM evidence grader는 다음 구조를 반환한다.
+
+```json
+{
+  "is_sufficient": true,
+  "reason": "질문한 카드 사용처 기준이 검색된 청크에 직접 설명되어 있음",
+  "source_chunk_ids": ["pdf-page-12-chunk-2"]
+}
+```
+
+`generate_answer`는 `source_chunk_ids`에 포함된 청크만 근거로 사용한다. grader가 `is_sufficient: false`를 반환하면 `fallback_no_answer`로 이동한다.
 
 ## 6. 백엔드 책임
 
@@ -113,6 +146,7 @@ stateDiagram-v2
 - 텍스트를 검색 가능한 청크로 나눈다.
 - 임베딩을 생성한다.
 - 문서, 벡터, 메타데이터를 Chroma에 저장한다.
+- 추출 품질 지표를 출력하고 비정상적인 추출 결과를 실패로 처리한다.
 
 ### `rag`
 
@@ -163,6 +197,8 @@ stateDiagram-v2
 
 ### Chat Response
 
+성공 계열 응답은 HTTP 200을 사용한다. PDF 근거가 부족한 경우도 시스템 오류가 아니므로 HTTP 200으로 반환한다.
+
 ```json
 {
   "answer": "청년수당 사용처는 안내책자의 사용 기준에 따라 확인해야 합니다...",
@@ -180,7 +216,20 @@ stateDiagram-v2
 }
 ```
 
+근거 부족 응답:
+
+```json
+{
+  "answer": "안내책자에서 해당 내용을 확인하지 못했습니다. 최신 공식 안내 확인이 필요할 수 있습니다.",
+  "sources": [],
+  "status": "insufficient_pdf_evidence",
+  "needs_external_search": true
+}
+```
+
 ### Error Response
+
+실행 실패는 HTTP 오류 상태와 error response를 사용한다.
 
 ```json
 {
@@ -188,6 +237,13 @@ stateDiagram-v2
   "message": "PDF 인덱스가 없습니다. 먼저 indexing 명령을 실행하세요."
 }
 ```
+
+권장 HTTP 매핑:
+
+- `400 invalid_request`: 요청 형식이 잘못됨.
+- `409 index_missing`: Chroma 인덱스가 없음.
+- `500 generation_error`: OpenAI 또는 런타임 오류.
+- `500 indexing_error`: indexing 실행 실패.
 
 ## 9. 권장 로컬 디렉터리 구조
 
@@ -230,6 +286,7 @@ docs/
 
 - PDF 파일 없음.
 - PDF 텍스트 추출 실패.
+- PDF 텍스트 추출 품질 부족.
 - Chroma 인덱스 없음.
 - OpenAI API 실패.
 - rate limit 또는 네트워크 실패.
@@ -243,10 +300,13 @@ docs/
 백엔드 테스트는 다음을 확인한다.
 
 - indexing이 Chroma 데이터를 생성한다.
+- indexing이 페이지 수, 빈 페이지 수, 추출 문자 수, 청크 수를 출력한다.
+- 텍스트 추출 결과가 비정상적으로 작으면 indexing이 실패한다.
 - 청크 메타데이터에 `source`, `page`, `chunk_id`가 포함된다.
 - `/health`가 `ok`를 반환한다.
 - `/chat`이 answer, sources, status, `needs_external_search`를 반환한다.
 - 근거가 부족하면 `insufficient_pdf_evidence`를 반환한다.
+- 근거가 부족한 질문에서는 일반 지식 답변을 생성하지 않는다.
 - 인덱스가 없으면 안정적인 `index_missing` 오류를 반환한다.
 
 프론트엔드 테스트 또는 수동 검증은 다음을 확인한다.
@@ -257,4 +317,3 @@ docs/
 - 요청 중 로딩 상태가 표시된다.
 - 백엔드 연결 실패 시 오류 상태가 표시된다.
 - 새로고침하면 채팅 기록이 사라진다.
-
