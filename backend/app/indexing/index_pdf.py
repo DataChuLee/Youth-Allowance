@@ -86,6 +86,7 @@ def index_pdf() -> IndexingStats:
     )
     Chroma.from_documents(
         documents=chunks,
+        ids=[str(chunk.metadata["chunk_id"]) for chunk in chunks],
         embedding=embeddings,
         persist_directory=str(settings.chroma_dir),
         collection_name="youth_allowance_booklet",
