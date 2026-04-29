@@ -1,5 +1,6 @@
 from langchain_core.documents import Document
 
+from app.api.schemas import ChatResponse
 from app.graph.state import EvidenceDecision, GraphState, RetrievedDocument
 from app.rag.sources import document_to_source
 
@@ -69,6 +70,17 @@ def fallback_no_answer(state: GraphState) -> GraphState:
     state.status = "insufficient_pdf_evidence"
     state.needs_external_search = True
     return state
+
+
+def run_chat_graph(question: str) -> ChatResponse:
+    state = GraphState(question=question)
+    state = fallback_no_answer(state)
+    return ChatResponse(
+        answer=state.answer,
+        sources=state.sources,
+        status=state.status,
+        needs_external_search=state.needs_external_search,
+    )
 
 
 def retrieved_document_from_score(document: Document, score: float) -> RetrievedDocument:
