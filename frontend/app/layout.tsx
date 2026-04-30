@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import "./globals.css";
+
 export const metadata = {
   title: "Youth Allowance RAG Chatbot",
   description: "PDF-grounded FAQ chatbot for youth allowance participants.",

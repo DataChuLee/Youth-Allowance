@@ -1,0 +1,169 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  color-scheme: light;
+  --background: #f6f7f9;
+  --surface: #ffffff;
+  --surface-muted: #f0f4f8;
+  --border: #d9dde3;
+  --border-soft: #e3e6eb;
+  --text: #15171a;
+  --muted: #5f6975;
+  --accent: #2457a6;
+  --accent-soft: #e9f2ff;
+  --danger: #b42318;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: var(--background);
+  color: var(--text);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  padding: 10px 12px;
+  border: 1px solid #c7d0da;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+button:disabled,
+input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.page {
+  min-height: 100vh;
+  padding: 32px 16px;
+}
+
+.chat-shell {
+  width: min(920px, 100%);
+  margin: 0 auto;
+}
+
+.chat-shell header {
+  margin-bottom: 20px;
+}
+
+.chat-shell h1 {
+  margin: 0 0 8px;
+  font-size: clamp(1.75rem, 4vw, 2.4rem);
+  line-height: 1.2;
+}
+
+.chat-shell header p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.quick-question-bar,
+.chat-input {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.quick-question-bar {
+  margin-bottom: 20px;
+}
+
+.quick-question-bar button {
+  background: var(--surface-muted);
+}
+
+.message-list {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0;
+}
+
+.message {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  line-height: 1.6;
+}
+
+.message p {
+  margin: 0;
+}
+
+.message.user {
+  background: var(--accent-soft);
+  border-color: #c8dbf4;
+}
+
+.source-list {
+  margin-top: 10px;
+}
+
+.source-item {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+  color: #2f3842;
+}
+
+.source-item strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+
+.chat-input {
+  align-items: stretch;
+}
+
+.chat-input input {
+  flex: 1;
+  min-width: 220px;
+  padding: 10px 12px;
+  border: 1px solid #c7d0da;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.chat-input input:focus {
+  outline: 2px solid rgba(36, 87, 166, 0.22);
+  border-color: var(--accent);
+}
+
+.status {
+  color: var(--muted);
+}
+
+.error {
+  color: var(--danger);
+}
+
+@media (max-width: 560px) {
+  .page {
+    padding: 24px 12px;
+  }
+
+  .quick-question-bar button,
+  .chat-input button,
+  .chat-input input {
+    width: 100%;
+  }
+}
