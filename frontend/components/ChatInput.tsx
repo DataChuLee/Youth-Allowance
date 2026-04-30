@@ -20,10 +20,11 @@ export function ChatInput({
   return (
     <form className="chat-input" onSubmit={handleSubmit}>
       <input
-        value={value}
+        aria-label="청년수당 질문"
         disabled={disabled}
-        placeholder="청년수당에 대해 질문하세요"
         onChange={(event) => setValue(event.target.value)}
+        placeholder="청년수당에 대해 질문하세요"
+        value={value}
       />
       <button disabled={disabled} type="submit">
         전송

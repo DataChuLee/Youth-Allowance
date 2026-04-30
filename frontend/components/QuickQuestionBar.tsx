@@ -5,11 +5,17 @@ const QUESTIONS = [
   "현금 사용 가능 여부",
 ];
 
-export function QuickQuestionBar({ onSelect }: { onSelect: (question: string) => void }) {
+export function QuickQuestionBar({
+  disabled,
+  onSelect,
+}: {
+  disabled: boolean;
+  onSelect: (question: string) => void;
+}) {
   return (
     <div className="quick-question-bar">
       {QUESTIONS.map((question) => (
-        <button key={question} type="button" onClick={() => onSelect(question)}>
+        <button disabled={disabled} key={question} onClick={() => onSelect(question)} type="button">
           {question}
         </button>
       ))}
