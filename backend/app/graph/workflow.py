@@ -50,7 +50,8 @@ def assess_evidence(
 def generate_answer_from_documents(state: GraphState) -> GraphState:
     allowed = set(state.evidence.source_chunk_ids)
     documents = [
-        item.document for item in state.retrieved_documents
+        item.document
+        for item in state.retrieved_documents
         if str(item.document.metadata.get("chunk_id")) in allowed
     ]
     if not documents:
@@ -65,7 +66,10 @@ def generate_answer_from_documents(state: GraphState) -> GraphState:
 
 
 def fallback_no_answer(state: GraphState) -> GraphState:
-    state.answer = "안내책자에서 해당 내용을 확인하지 못했습니다. 최신 공식 안내 확인이 필요할 수 있습니다."
+    state.answer = (
+        "안내책자에서 해당 내용을 확인하지 못했습니다. "
+        "최신 공식 안내 확인이 필요할 수 있습니다."
+    )
     state.sources = []
     state.status = "insufficient_pdf_evidence"
     state.needs_external_search = True

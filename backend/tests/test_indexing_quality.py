@@ -52,7 +52,7 @@ def test_index_pdf_uses_deterministic_chroma_ids(
         "load_pdf_pages",
         lambda _: [
             Document(
-                page_content="충분한 텍스트 " * 100,
+                page_content="충분한 텍스트" * 100,
                 metadata={"page": 0, "source": "booklet.pdf"},
             )
         ],

@@ -1,11 +1,11 @@
 from langchain_core.documents import Document
 
+from app.graph.state import GraphState, RetrievedDocument
 from app.graph.workflow import (
     assess_evidence,
     fallback_no_answer,
     generate_answer_from_documents,
 )
-from app.graph.state import GraphState, RetrievedDocument
 
 
 def test_assess_evidence_rejects_no_documents() -> None:
@@ -95,6 +95,6 @@ def test_fallback_returns_external_search_signal() -> None:
 
     result = fallback_no_answer(state)
 
-    assert result.answer.startswith("안내책자에서 해당 내용을 확인하지 못했습니다")
+    assert result.answer.startswith("안내책자에서 해당 내용을 확인하지 못했습니다.")
     assert result.needs_external_search is True
     assert result.status == "insufficient_pdf_evidence"
