@@ -22,7 +22,9 @@ The graph uses two top-level intents:
 - `general_answer`: greetings, assistant identity questions, capability questions, and off-topic requests.
 - `rag`: Youth Allowance policy, eligibility, usage, card, evidence, restriction, payment method, or booklet-related questions.
 
-The classifier should be conservative. If a question might be about Youth Allowance, route it to `rag`. Only clear greetings, identity/capability questions, and clear off-topic requests should route to `general_answer`.
+The classifier uses an LLM-based LangChain LCEL chain. The chain returns structured JSON with one of the two intents and a short reason. It should be conservative: if a question might be about Youth Allowance, route it to `rag`. Only clear greetings, identity/capability questions, and clear off-topic requests should route to `general_answer`.
+
+The LLM prompt must make clear that `general_answer` is not open-domain conversation. It is only for assistant introduction, usage guidance, and scope redirection.
 
 ## Graph Flow
 
@@ -54,6 +56,18 @@ Add a separate `intent` field:
 
 - `general_answer`
 - `rag`
+
+Allowed `intent` and `status` combinations:
+
+```text
+intent=general_answer
+  status=general_answer
+
+intent=rag
+  status=answered_from_pdf
+  status=insufficient_pdf_evidence
+  status=blocked_by_policy
+```
 
 Response behavior:
 
@@ -106,7 +120,7 @@ Rendering rules:
 
 - `general_answer`: show only the assistant message; do not show source UI or evidence warning.
 - `answered_from_pdf`: show answer and sources.
-- `blocked_by_policy`: show answer and sources, with a restriction-oriented label if the current UI has a status label area.
+- `blocked_by_policy`: show answer and sources, and add a visible restriction-oriented label such as `사용 제한 근거`.
 - `insufficient_pdf_evidence`: show answer without sources and keep the "official 안내 확인 필요" style guidance.
 
 No broad UI redesign is required. The change is primarily type-safe status handling and clearer conditional rendering.
@@ -118,6 +132,8 @@ Add or update focused modules:
 - `backend/app/graph/state.py`: add `intent`.
 - `backend/app/graph/workflow.py`: add `classify_intent`, `general_answer`, and the new conditional edge before `plan_queries`.
 - `backend/app/api/schemas.py`: expand `ChatResponse.status` and add `intent`.
+- `backend/app/rag/prompts.py`: add the intent-classifier prompt.
+- `backend/app/rag/intent.py`: add an LCEL classifier chain and a fixed fallback that routes ambiguous classifier failures to `rag`.
 - `backend/app/rag/generation.py` or a new small helper: provide fixed general-answer builders.
 - `backend/tests/`: add tests for greeting, assistant identity, off-topic, normal RAG routing, and policy-blocked status.
 
@@ -128,6 +144,7 @@ Backend tests:
 - Greeting input returns `intent="general_answer"`, `status="general_answer"`, no sources, and no external search.
 - Assistant identity input returns scoped assistant introduction.
 - Clear off-topic input returns a scope redirection, not PDF evidence fallback.
+- Ambiguous classifier output or classifier failure routes to `rag`.
 - A Youth Allowance question still reaches retrieval/RAG.
 - Policy blocker returns `status="blocked_by_policy"` with PDF sources.
 - Existing `answered_from_pdf` and `insufficient_pdf_evidence` cases still pass.
@@ -136,7 +153,7 @@ Frontend tests:
 
 - Type contract accepts all four status values.
 - General answer renders without sources.
-- Blocked policy answer renders sources and a restriction status.
+- Blocked policy answer renders sources and a visible `사용 제한 근거` label.
 - Insufficient evidence still renders without sources.
 
 ## Risks
