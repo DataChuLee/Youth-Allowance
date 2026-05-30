@@ -9,6 +9,11 @@ export type Source = {
 export type ChatResponse = {
   answer: string;
   sources: Source[];
-  status: "answered_from_pdf" | "insufficient_pdf_evidence";
+  status:
+    | "general_answer"
+    | "answered_from_pdf"
+    | "insufficient_pdf_evidence"
+    | "blocked_by_policy";
   needs_external_search: boolean;
+  intent: "general_answer" | "rag";
 };
