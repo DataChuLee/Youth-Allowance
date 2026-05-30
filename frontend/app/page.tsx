@@ -36,26 +36,73 @@ export default function Page() {
   }
 
   return (
-    <main className="page">
-      <section className="chat-shell">
-        <header>
-          <h1>청년수당 안내 챗봇</h1>
-          <p>주민등록번호, 계좌번호 등 민감정보는 입력하지 마세요.</p>
-        </header>
-        <QuickQuestionBar disabled={isLoading} onSelect={ask} />
-        <MessageList messages={messages} />
-        {isLoading ? (
-          <p aria-live="polite" className="status" role="status">
-            답변을 생성하는 중입니다.
-          </p>
-        ) : null}
-        {error ? (
-          <p className="error" role="alert">
-            {error}
-          </p>
-        ) : null}
-        <ChatInput disabled={isLoading} onSubmit={ask} />
-      </section>
-    </main>
+    <div className="app-frame">
+      <header className="brand-header" aria-label="서비스 상단">
+        <div className="brand-header-inner">
+          <div className="logo-plate">
+            <img
+              alt="청년몽땅정보통"
+              className="brand-logo"
+              height="64"
+              src="/청년몽땅정보통.png"
+              width="240"
+            />
+          </div>
+          <strong className="assistant-title">청년수당 AI Assistant</strong>
+        </div>
+      </header>
+
+      <main className="chat-page" aria-labelledby="chat-title">
+        {messages.length === 0 ? (
+          <section className="intro-card" aria-labelledby="chat-title">
+            <p className="intro-kicker">PDF 안내책자 기반 답변</p>
+            <h1 id="chat-title">
+              청년수당 궁금한 점을
+              <span>바로 알려드립니다.</span>
+            </h1>
+            <p className="intro-copy">
+              사용처, 활동기록서, 자격상실처럼 참여자가 자주 묻는 내용을 자연스럽게
+              이어 물어보세요. 구체적으로 입력할수록 더 정확하게 답변합니다.
+            </p>
+
+            <div className="feature-grid" aria-label="안내 영역">
+              <article>
+                <span aria-hidden="true">💳</span>
+                <strong>사용처 안내</strong>
+                <p>카드 사용, 현금 사용, 제한 업종 기준 확인</p>
+              </article>
+              <article>
+                <span aria-hidden="true">📝</span>
+                <strong>제출 안내</strong>
+                <p>활동기록서와 참여 중 제출해야 할 내용 안내</p>
+              </article>
+              <article>
+                <span aria-hidden="true">🔎</span>
+                <strong>자격 확인</strong>
+                <p>자격상실, 참여 중단, 유의사항 탐색</p>
+              </article>
+            </div>
+
+            <QuickQuestionBar disabled={isLoading} onSelect={ask} />
+          </section>
+        ) : (
+          <section className="conversation-panel" aria-label="청년수당 안내 채팅">
+            <MessageList isLoading={isLoading} messages={messages} />
+          </section>
+        )}
+
+        <div className="input-dock">
+          <div className="input-dock-inner">
+            <ChatInput disabled={isLoading} onSubmit={ask} />
+          </div>
+
+          {error ? (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </div>
+      </main>
+    </div>
   );
 }
