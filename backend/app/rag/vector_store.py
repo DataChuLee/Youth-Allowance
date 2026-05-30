@@ -5,6 +5,7 @@ from langchain_openai import OpenAIEmbeddings
 
 from app.core.config import Settings
 from app.core.errors import IndexMissingError
+from app.graph.state import RetrievedDocument
 
 COLLECTION_NAME = "youth_allowance_booklet"
 
@@ -26,3 +27,15 @@ def create_vector_store(settings: Settings) -> Chroma:
         embedding_function=embeddings,
         create_collection_if_not_exists=False,
     )
+
+
+def retrieve_pdf_documents(question: str, settings: Settings) -> list[RetrievedDocument]:
+    vector_store = create_vector_store(settings)
+    results = vector_store.similarity_search_with_relevance_scores(
+        question,
+        k=settings.retrieval_top_k,
+    )
+    return [
+        RetrievedDocument(document=document, score=float(score))
+        for document, score in results
+    ]
