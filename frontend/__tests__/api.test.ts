@@ -14,6 +14,7 @@ test("sendChatMessage posts question to backend", async () => {
       sources: [],
       status: "insufficient_pdf_evidence",
       needs_external_search: true,
+      intent: "rag",
     }),
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -26,4 +27,5 @@ test("sendChatMessage posts question to backend", async () => {
     body: JSON.stringify({ question: "question" }),
   });
   expect(result.answer).toBe("answer");
+  expect(result.intent).toBe("rag");
 });
