@@ -18,5 +18,11 @@ class Source(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     sources: list[Source]
-    status: Literal["answered_from_pdf", "insufficient_pdf_evidence"]
+    status: Literal[
+        "general_answer",
+        "answered_from_pdf",
+        "insufficient_pdf_evidence",
+        "blocked_by_policy",
+    ]
     needs_external_search: bool
+    intent: Literal["general_answer", "rag"] = "rag"
