@@ -7,3 +7,7 @@ __pycache__/
 .pytest_cache/
 frontend/node_modules/
 frontend/.next/
+/study
+/storage/
+/backend/storage/chroma/
+/backend/*.egg-info/
