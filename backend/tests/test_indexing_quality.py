@@ -36,6 +36,42 @@ def test_validate_indexing_stats_rejects_low_text_pdf() -> None:
         validate_indexing_stats(stats)
 
 
+def test_load_pdf_pages_uses_ocr_when_pypdf_extracts_no_text(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pdf_path = tmp_path / "booklet.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4")
+    captured = {}
+
+    class FakeLoader:
+        def __init__(self, path: str):
+            captured["loader_path"] = path
+
+        def load(self) -> list[Document]:
+            return [
+                Document(page_content="", metadata={"page": 0, "source": str(pdf_path)}),
+                Document(page_content="   ", metadata={"page": 1, "source": str(pdf_path)}),
+            ]
+
+    def fake_ocr(path: Path) -> list[Document]:
+        captured["ocr_path"] = path
+        return [
+            Document(
+                page_content="OCR로 추출한 청년수당 안내 텍스트",
+                metadata={"page": 0, "source": str(path)},
+            )
+        ]
+
+    monkeypatch.setattr(indexing_module, "PyPDFLoader", FakeLoader)
+    monkeypatch.setattr(indexing_module, "load_pdf_pages_with_ocr", fake_ocr)
+
+    pages = indexing_module.load_pdf_pages(pdf_path)
+
+    assert captured["loader_path"] == str(pdf_path)
+    assert captured["ocr_path"] == pdf_path
+    assert pages[0].page_content == "OCR로 추출한 청년수당 안내 텍스트"
+
+
 def test_index_pdf_uses_deterministic_chroma_ids(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
