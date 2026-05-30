@@ -33,6 +33,7 @@ def test_chat_returns_fallback_for_valid_question() -> None:
         "sources": [],
         "status": "insufficient_pdf_evidence",
         "needs_external_search": True,
+        "intent": "rag",
     }
 
 
