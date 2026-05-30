@@ -1,12 +1,19 @@
 from pathlib import Path
+import sys
+import base64
+from dotenv import load_dotenv
 
 from langchain_chroma import Chroma
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from openai import OpenAI
 
-from app.core.config import get_settings
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from app.core.config import Settings, get_settings
 from app.core.errors import IndexingError
 from app.indexing.quality import (
     IndexingStats,
@@ -14,7 +21,10 @@ from app.indexing.quality import (
     validate_indexing_stats,
 )
 
+load_dotenv()
+
 BOOKLET_TITLE = "청년수당 참여자 안내책자"
+OCR_MODEL = "gpt-4o-mini"
 
 
 def build_chunk_id(page: int, index: int) -> str:
@@ -26,7 +36,74 @@ def load_pdf_pages(pdf_path: Path) -> list[Document]:
         raise IndexingError(f"PDF 파일을 찾을 수 없습니다: {pdf_path}")
 
     loader = PyPDFLoader(str(pdf_path))
-    return loader.load()
+    pages = loader.load()
+    if pages and any(page.page_content.strip() for page in pages):
+        return pages
+    return load_pdf_pages_with_ocr(pdf_path)
+
+
+def load_pdf_pages_with_ocr(pdf_path: Path, settings: Settings | None = None) -> list[Document]:
+    settings = settings or get_settings()
+    try:
+        import fitz
+    except ImportError as exc:
+        raise IndexingError(
+            "PDF 텍스트를 추출하지 못했습니다. 이미지 기반 PDF OCR을 위해 pymupdf 설치가 필요합니다."
+        ) from exc
+
+    client = OpenAI(api_key=settings.openai_api_key)
+    pdf = fitz.open(str(pdf_path))
+    pages: list[Document] = []
+
+    try:
+        for page_index in range(pdf.page_count):
+            page = pdf.load_page(page_index)
+            pixmap = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
+            image_bytes = pixmap.tobytes("png")
+            text = extract_text_from_page_image(client, image_bytes)
+            pages.append(
+                Document(
+                    page_content=text,
+                    metadata={"page": page_index, "source": str(pdf_path)},
+                )
+            )
+    finally:
+        pdf.close()
+
+    return pages
+
+
+def extract_text_from_page_image(client: OpenAI, image_bytes: bytes) -> str:
+    encoded_image = base64.b64encode(image_bytes).decode("ascii")
+    response = client.chat.completions.create(
+        model=OCR_MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "이미지에 보이는 한국어 문서를 OCR로 전사하세요. "
+                    "문서에 없는 내용을 추가하지 말고, 읽을 수 없는 부분은 생략하세요."
+                ),
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "이 페이지의 모든 읽을 수 있는 텍스트를 줄바꿈을 유지해 전사하세요.",
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{encoded_image}",
+                            "detail": "high",
+                        },
+                    },
+                ],
+            },
+        ],
+    )
+    return response.choices[0].message.content or ""
 
 
 def split_pages(pages: list[Document]) -> list[Document]:
