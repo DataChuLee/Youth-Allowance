@@ -19,13 +19,15 @@ MVP의 답변 기준 문서는 `Data/청년수당 참여자 안내책자.pdf` �
 ```mermaid
 flowchart LR
     User[참여자] --> Frontend[Next.js Frontend]
-    Frontend -->|POST /chat| Backend[FastAPI Backend]
+    Frontend -->|POST /api/v1/chat or /api/v1/chat/stream| Backend[FastAPI Backend]
     Frontend -->|GET /health| Backend
 
     Backend --> Graph[LangGraph RAG Workflow]
     Graph --> Retriever[PDF Retriever]
-    Retriever --> Chroma[(Local Chroma Vector Store)]
-    Chroma --> Retriever
+    Retriever --> FAISS[(Local FAISS Index)]
+    Retriever --> BM25[BM25 Lexical Search]
+    FAISS --> Retriever
+    BM25 --> Retriever
     Graph --> LLM[OpenAI Chat Model]
     Graph --> Trace[LangSmith Tracing]
 
@@ -46,23 +48,23 @@ sequenceDiagram
     participant F as Next.js Frontend
     participant A as FastAPI API
     participant G as LangGraph
-    participant C as Chroma
+    participant C as FAISS + BM25
     participant O as OpenAI
 
     U->>F: 질문 입력
-    F->>A: POST /chat
+    F->>A: POST /api/v1/chat/stream + thread_id + recent history
     A->>G: 질문으로 그래프 실행
-    G->>C: 관련 PDF 청크 top-k 검색
+    G->>C: FAISS + BM25 RRF 관련 PDF 청크 top-k 검색
     C-->>G: 페이지 메타데이터와 score가 있는 청크 반환
     G->>G: score 기준 + LLM grader로 근거 충분성 판단
     alt PDF 근거 충분
         G->>O: 근거 기반 한국어 답변 생성
-        O-->>G: 답변 반환
-        G-->>A: answer + sources + answered_from_pdf
+        O-->>G: 답변 토큰 반환
+        G-->>A: token stream + sources + answered_from_pdf
     else PDF 근거 부족
         G-->>A: fallback + no sources + needs_external_search
     end
-    A-->>F: JSON 응답
+    A-->>F: token 이벤트와 done 이벤트
     F-->>U: 답변과 출처 렌더링
 ```
 
@@ -167,6 +169,7 @@ LLM evidence grader는 다음 구조를 반환한다.
 - FastAPI 라우트를 제공한다.
 - 요청과 응답 스키마를 검증한다.
 - 그래프 출력을 프론트엔드 친화적인 JSON으로 변환한다.
+- 스트리밍 요청에서는 최종 생성 단계의 토큰을 `text/event-stream` 이벤트로 변환한다.
 - 알려진 오류를 안정적인 error code로 반환한다.
 
 ## 7. 프론트엔드 책임
@@ -227,13 +230,25 @@ LLM evidence grader는 다음 구조를 반환한다.
 }
 ```
 
+### Chat Stream Response
+
+`POST /api/v1/chat/stream`은 `/api/v1/chat`과 같은 요청 body를 받고 `text/event-stream`을 반환한다. 답변 본문은 `token` 이벤트로 누적하고, 출처와 상태는 마지막 `done` 이벤트에서 확정한다. 브라우저의 `thread_id`와 최근 대화는 요청 단위로만 사용하며 서버에 저장하지 않는다.
+
+```text
+event: token
+data: {"text":"안내책자 근거로 "}
+
+event: done
+data: {"answer":"안내책자 근거로 확인한 답변입니다.","sources":[],"status":"answered_from_pdf","needs_external_search":false,"intent":"rag"}
+```
+
 ### Error Response
 
-실행 실패는 HTTP 오류 상태와 error response를 사용한다.
+실행 실패는 HTTP 오류 상태와 공통 error response를 사용한다. SSE 생성 중 실패도 같은 필드를 가진 `error` 이벤트로 반환한다.
 
 ```json
 {
-  "error": "index_missing",
+  "code": "index_missing",
   "message": "PDF 인덱스가 없습니다. 먼저 indexing 명령을 실행하세요."
 }
 ```
@@ -278,7 +293,50 @@ docs/
 - `LANGSMITH_TRACING`
 - `LANGSMITH_PROJECT`
 
-애플리케이션은 secret 값을 출력하면 안 된다. LangSmith 설정이 없어도 로컬 개발은 가능해야 한다. OpenAI 설정이 없으면 indexing 또는 답변 생성 시 명확히 실패해야 한다.
+애플리케이션은 secret 값을 출력하면 안 된다. LangSmith 설정이 없어도 로컬 개발은 가능해야 하며 `LANGSMITH_TRACING`의 기본값은 비활성화다. OpenAI 설정이 없으면 indexing 또는 답변 생성 시 명확히 실패해야 한다.
+
+### 10.1 Redis cache 직렬화 경계
+
+- 검색 결과는 `rag:v5` namespace에 `page_content`, JSON으로 정규화한
+  `metadata`, `score`만 저장한다.
+- pickle을 읽거나 쓰지 않는다. 이전 `rag:v4` 값은 조회 및 flush 대상에서 제외하고
+  TTL에 따라 자연 만료시킨다.
+- JSON 파싱 실패, schema/version 불일치, 예상하지 못한 타입은 cache miss다.
+- Redis get/set/delete 장애는 검색 요청으로 전파하지 않는다.
+
+### 10.2 FAISS 신뢰 경계와 PDF fallback cache
+
+설치된 LangChain FAISS 포맷은 벡터 데이터 `index.faiss`와 docstore 및
+index-to-document ID 매핑 `index.pkl`을 함께 로드한다. `FAISS.load_local`의
+`allow_dangerous_deserialization=True`는 후자의 pickle 역직렬화 때문에 필요하다.
+현행 인덱스에는 pickle을 대체하는 안전한 동등 파일이 없으므로 이번 단계에서는
+포맷을 임의로 바꾸지 않는다.
+
+위험 옵션을 사용하기 전에 다음 경계를 코드로 검사한다.
+
+- 인덱스 디렉터리는 애플리케이션이 관리하는 `backend/` 루트 내부여야 한다.
+- `index.faiss`와 `index.pkl`은 모두 존재하는 일반 파일이어야 하며 symlink는
+  허용하지 않는다.
+- 경로는 배포 설정으로만 정하며 요청 파라미터, 업로드 파일, 외부 URL에서 받지 않는다.
+- 신뢰할 수 있는 빌드 과정에서 직접 생성한 인덱스만 배치한다. 다운로드했거나 출처와
+  무결성을 검증하지 않은 인덱스는 로드하지 않는다.
+- 검증 실패나 인덱스 손상은 PDF 텍스트 기반 BM25-only 경로로 격리한다.
+
+BM25 fallback corpus는 프로세스별 LRU cache에 최대 4개 보관한다. cache key는
+정규화된 PDF 경로, `st_mtime_ns`, 파일 크기이며 파일 상태가 바뀌면 재파싱한다.
+서버 재시작 시 cache는 비워지고 디스크 산출물은 만들지 않는다.
+
+### 10.3 운영 개인정보 로그 체크리스트
+
+- 애플리케이션 로그에는 question, history, 전체 request body, 답변, LangGraph state,
+  source 본문을 남기지 않는다.
+- 오류 관측은 request_id, 오류 code, 처리 단계처럼 비식별 정보만 사용한다.
+- thread_id가 꼭 필요할 때도 원문 대신 배포 계층에서 단방향 해시 또는 일부 마스킹을
+  적용한다.
+- LangSmith를 활성화하기 전 입력·출력 비저장 또는 마스킹 설정을 검토한다.
+- reverse proxy와 API gateway에서 request/response body logging을 비활성화하고
+  access log에는 경로, 상태 코드, 지연 시간만 남긴다.
+- debug logging은 운영 기본값에서 비활성화하고 보존 기간과 접근 권한을 정한다.
 
 ## 11. 오류 처리
 
@@ -305,6 +363,7 @@ docs/
 - 청크 메타데이터에 `source`, `page`, `chunk_id`가 포함된다.
 - `/health`가 `ok`를 반환한다.
 - `/chat`이 answer, sources, status, `needs_external_search`를 반환한다.
+- `/chat/stream`이 답변 `token` 이벤트와 최종 `done` 이벤트를 반환한다.
 - 근거가 부족하면 `insufficient_pdf_evidence`를 반환한다.
 - 근거가 부족한 질문에서는 일반 지식 답변을 생성하지 않는다.
 - 인덱스가 없으면 안정적인 `index_missing` 오류를 반환한다.
