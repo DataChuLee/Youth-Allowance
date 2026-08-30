@@ -72,6 +72,20 @@ def detect_question_blockers(question: str) -> list[PolicyBlocker]:
     return blockers
 
 
+def build_policy_evidence_queries(question: str) -> list[str]:
+    """명시적 제한 질문에 대해 원문 규정 표현을 보강한다.
+
+    사용자의 표현만으로는 제한 조항 청크를 놓칠 수 있다. 다만 이 함수는
+    답변을 차단하지 않고 검색 쿼리만 추가한다. 실제 차단은 PDF 근거가
+    검색된 뒤 `attach_evidence_to_blockers`에서 결정한다.
+    """
+    queries: list[str] = []
+    for blocker in detect_question_blockers(question):
+        rule = BLOCKING_SIGNALS[blocker.key]
+        queries.append("청년수당 " + " ".join(rule["evidence_terms"]))
+    return list(dict.fromkeys(queries))
+
+
 def attach_evidence_to_blockers(
     blockers: list[PolicyBlocker],
     documents: list[Document],
@@ -165,7 +179,7 @@ def supports_study_device_inference(document: Document) -> bool:
 def resolve_policy_decision(
     question: str,
     documents: list[Document],
-    evidence: EvidenceDecision,
+    evidence: EvidenceDecision | None,
 ) -> PolicyDecision:
     matched_blockers = attach_evidence_to_blockers(
         detect_question_blockers(question),
@@ -184,6 +198,10 @@ def resolve_policy_decision(
             matched_blockers=matched_blockers,
             source_chunk_ids=list(dict.fromkeys(source_chunk_ids)),
         )
+
+    # 사전 점검에서는 정책 제한 근거만 우선 차단하고, 나머지 질문은 LLM 근거 평가로 넘긴다.
+    if evidence is None:
+        return PolicyDecision(decision="conditional", reason="정책 제한 근거가 확인되지 않았습니다.")
 
     if evidence.is_sufficient:
         return PolicyDecision(

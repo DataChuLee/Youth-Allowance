@@ -137,7 +137,7 @@ def collect_stats(pages: list[Document], chunks: list[Document]) -> IndexingStat
     empty_pages = sum(1 for page in pages if not page.page_content.strip())
     total_characters = sum(len(page.page_content.strip()) for page in pages)
     sample_chunks = [
-        f"page={chunk.metadata['page']} chunk_id={chunk.metadata['chunk_id']} text={chunk.page_content[:120]}"
+        f"page={chunk.metadata['page']} chunk_id={chunk.metadata['chunk_id']}"
         for chunk in chunks[:3]
     ]
     return IndexingStats(
