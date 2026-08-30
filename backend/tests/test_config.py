@@ -1,6 +1,7 @@
 from app.core.config import (
     DEFAULT_CHROMA_DIR,
     DEFAULT_ENV_FILE,
+    DEFAULT_FAISS_INDEX_DIR,
     DEFAULT_OPENAI_CHAT_MODEL,
     DEFAULT_OPENAI_EMBEDDING_MODEL,
     DEFAULT_PDF_PATH,
@@ -13,6 +14,7 @@ def test_default_paths_are_anchored_to_project_layout() -> None:
     assert DEFAULT_PDF_PATH.name == "청년수당 참여자 안내책자.pdf"
     assert DEFAULT_PDF_PATH.parent.name == "Data"
     assert DEFAULT_CHROMA_DIR.parts[-2:] == ("storage", "chroma")
+    assert DEFAULT_FAISS_INDEX_DIR.name == "faiss_rag_final"
     assert DEFAULT_ENV_FILE.name == ".env"
     assert DEFAULT_ENV_FILE.parent == PROJECT_ROOT
 
@@ -26,3 +28,5 @@ def test_openai_model_names_have_safe_defaults(monkeypatch) -> None:
 
     assert settings.openai_chat_model == DEFAULT_OPENAI_CHAT_MODEL
     assert settings.openai_embedding_model == DEFAULT_OPENAI_EMBEDDING_MODEL
+    assert settings.retrieval_candidate_k == 20
+    assert settings.retrieval_rrf_k == 60
