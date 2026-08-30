@@ -5,29 +5,57 @@ import { useRef, useState } from "react";
 import { ChatInput } from "../components/ChatInput";
 import { MessageList, type ChatMessage } from "../components/MessageList";
 import { QuickQuestionBar } from "../components/QuickQuestionBar";
-import { sendChatMessage } from "../lib/api";
+import { streamChatMessage } from "../lib/api";
+import { getOrCreateThreadId } from "../lib/session";
+import type { ConversationMessage } from "../lib/types";
 
 export default function Page() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inFlightRef = useRef(false);
+  const threadIdRef = useRef<string | null>(null);
 
   async function ask(question: string) {
     if (inFlightRef.current) return;
 
     inFlightRef.current = true;
+    const history = buildConversationHistory(messages);
+    const threadId = threadIdRef.current ?? getOrCreateThreadId();
+    threadIdRef.current = threadId;
     setError(null);
     setIsLoading(true);
-    setMessages((current) => [...current, { role: "user", content: question }]);
+    setMessages((current) => [
+      ...current,
+      { role: "user", content: question },
+      { role: "assistant", content: "", isStreaming: true },
+    ]);
 
     try {
-      const response = await sendChatMessage(question);
-      setMessages((current) => [
-        ...current,
-        { role: "assistant", content: response.answer, response },
-      ]);
+      const response = await streamChatMessage(
+        question,
+        {
+          onToken: (token) => {
+            setMessages((current) =>
+              updateStreamingAssistant(current, (message) => ({
+                ...message,
+                content: message.content + token,
+              })),
+            );
+          },
+        },
+        { threadId, history },
+      );
+      setMessages((current) =>
+        updateStreamingAssistant(current, (message) => ({
+          ...message,
+          content: response.answer || message.content,
+          response,
+          isStreaming: false,
+        })),
+      );
     } catch (err) {
+      setMessages(removeEmptyStreamingAssistant);
       setError(err instanceof Error ? err.message : "요청에 실패했습니다.");
     } finally {
       inFlightRef.current = false;
@@ -44,7 +72,7 @@ export default function Page() {
               alt="청년몽땅정보통"
               className="brand-logo"
               height="64"
-              src="/청년몽땅정보통.png"
+              src="/logo.png"
               width="240"
             />
           </div>
@@ -104,5 +132,40 @@ export default function Page() {
         </div>
       </main>
     </div>
+  );
+}
+
+function buildConversationHistory(messages: ChatMessage[]): ConversationMessage[] {
+  return messages
+    .filter(
+      (message) =>
+        message.content && (message.role === "user" || !message.isStreaming),
+    )
+    .map((message) => ({ role: message.role, content: message.content }))
+    .slice(-4);
+}
+
+function updateStreamingAssistant(
+  messages: ChatMessage[],
+  update: (
+    message: Extract<ChatMessage, { role: "assistant" }>,
+  ) => Extract<ChatMessage, { role: "assistant" }>,
+): ChatMessage[] {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+
+    if (message.role === "assistant" && message.isStreaming) {
+      const next = [...messages];
+      next[index] = update(message);
+      return next;
+    }
+  }
+
+  return messages;
+}
+
+function removeEmptyStreamingAssistant(messages: ChatMessage[]): ChatMessage[] {
+  return messages.filter(
+    (message) => !(message.role === "assistant" && message.isStreaming && !message.content),
   );
 }
