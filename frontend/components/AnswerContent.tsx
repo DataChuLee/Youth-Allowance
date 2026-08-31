@@ -2,7 +2,12 @@ import { Fragment, type ReactNode } from "react";
 
 type AnswerBlock =
   | { type: "paragraph"; text: string }
-  | { type: "ordered-list" | "unordered-list"; items: string[] };
+  | { type: "ordered-list" | "unordered-list"; items: AnswerListItem[] };
+
+type AnswerListItem = {
+  text: string;
+  children: AnswerListItem[];
+};
 
 const ORDERED_ITEM_PATTERN = /^\s*\d+[.)]\s+(.+)$/;
 const UNORDERED_ITEM_PATTERN = /^\s*[-*•]\s+(.+)$/;
@@ -23,7 +28,7 @@ export function AnswerContent({ content }: { content: string }) {
         return (
           <ListTag key={`${block.type}-${index}`}>
             {block.items.map((item, itemIndex) => (
-              <li key={`${item}-${itemIndex}`}>{renderListItem(item)}</li>
+              <li key={`${item.text}-${itemIndex}`}>{renderListItem(item)}</li>
             ))}
           </ListTag>
         );
@@ -49,7 +54,7 @@ function parseAnswerBlocks(content: string): AnswerBlock[] {
     }
 
     if (unorderedMatch) {
-      appendListItem(blocks, "unordered-list", unorderedMatch[1]);
+      appendNestedOrTopLevelBullet(blocks, unorderedMatch[1]);
       continue;
     }
 
@@ -65,16 +70,47 @@ function appendListItem(
   item: string,
 ) {
   const previousBlock = blocks[blocks.length - 1];
+  const listItem = createListItem(item);
 
   if (previousBlock?.type === type) {
-    previousBlock.items.push(item);
+    previousBlock.items.push(listItem);
     return;
   }
 
-  blocks.push({ type, items: [item] });
+  blocks.push({ type, items: [listItem] });
 }
 
-function renderListItem(item: string): ReactNode {
+function appendNestedOrTopLevelBullet(blocks: AnswerBlock[], item: string) {
+  const previousBlock = blocks[blocks.length - 1];
+
+  if (previousBlock?.type === "ordered-list" && previousBlock.items.length > 0) {
+    previousBlock.items[previousBlock.items.length - 1].children.push(createListItem(item));
+    return;
+  }
+
+  appendListItem(blocks, "unordered-list", item);
+}
+
+function createListItem(text: string): AnswerListItem {
+  return { text, children: [] };
+}
+
+function renderListItem(item: AnswerListItem): ReactNode {
+  return (
+    <>
+      {renderListItemText(item.text)}
+      {item.children.length > 0 ? (
+        <ul>
+          {item.children.map((child, index) => (
+            <li key={`${child.text}-${index}`}>{renderListItem(child)}</li>
+          ))}
+        </ul>
+      ) : null}
+    </>
+  );
+}
+
+function renderListItemText(item: string): ReactNode {
   const splitItem = splitListItem(item);
 
   if (!splitItem) {

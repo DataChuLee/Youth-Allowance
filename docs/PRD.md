@@ -49,7 +49,8 @@ MVP는 다음을 포함한다.
 - 로컬 Chroma 벡터 저장소.
 - PDF indexing 명령.
 - `GET /health` API.
-- `POST /chat` API.
+- canonical `POST /api/v1/chat` API와 deprecated 호환 `POST /chat` API.
+- `POST /api/v1/chat/stream` API.
 - 채팅 UI.
 - FAQ 빠른 질문 버튼.
 - 답변별 출처 표시.
@@ -70,7 +71,7 @@ UI에는 다음 요소가 포함된다.
 - 챗봇 답변 아래의 출처 목록.
 - 민감정보를 입력하지 말라는 짧은 안내 문구.
 
-대화 기록은 브라우저 상태에만 저장한다. 새로고침하면 대화는 사라진다.
+대화 기록은 브라우저 상태에만 저장한다. `thread_id`는 `sessionStorage`에 탭 단위로 유지하고, 최근 대화 최대 4개만 요청에 포함한다. 서버는 대화 기록을 저장하지 않는다.
 
 ## 8. 핵심 사용자 흐름
 
@@ -79,8 +80,8 @@ UI에는 다음 요소가 포함된다.
 3. 개발자가 Next.js 프론트엔드를 실행한다.
 4. 참여자가 로컬 웹앱에 접속한다.
 5. 참여자가 직접 질문하거나 FAQ 빠른 질문 버튼을 누른다.
-6. 프론트엔드는 `POST /chat`으로 질문을 보낸다.
-7. 백엔드는 Chroma에서 관련 PDF 청크를 검색한다.
+6. 프론트엔드는 기본적으로 `POST /api/v1/chat/stream`으로 질문을 보내고, 필요 시 `POST /api/v1/chat` JSON API를 사용할 수 있다.
+7. 백엔드는 FAISS와 BM25 결과를 RRF로 결합해 관련 PDF 청크를 검색한다.
 8. LangGraph가 검색 근거가 충분한지 판단한다.
 9. 근거가 충분하면 PDF 근거만 사용해 답변을 생성한다.
 10. 근거가 부족하면 안내책자에서 확인되지 않는다고 답하고, 향후 공식 출처 확인이 필요할 수 있음을 표시한다.
@@ -113,14 +114,17 @@ UI에는 다음 요소가 포함된다.
 
 ### 9.2 Chat API
 
-- 백엔드는 `POST /chat`을 제공해야 한다.
+- 백엔드는 `POST /api/v1/chat`과 `POST /api/v1/chat/stream`을 canonical 경로로 제공해야 한다.
+- 기존 `POST /chat`은 deprecated 호환 경로로 일시 유지해야 한다.
 - 요청 본문에는 사용자 질문이 포함되어야 한다.
-- 응답에는 다음이 포함되어야 한다.
+- `/chat` 응답과 `/chat/stream`의 최종 `done` 이벤트에는 다음이 포함되어야 한다.
   - 답변 텍스트.
   - 출처 목록.
   - 상태값.
   - 향후 외부 공식 검색이 필요한지 여부.
-- 서버는 MVP에서 대화 기록을 DB에 저장하지 않는다.
+- `/chat/stream`은 답변 생성 중 `token` 이벤트로 부분 답변을 보내야 한다.
+- 서버는 MVP에서 대화 기록을 DB, Redis 또는 프로세스 전역 메모리에 저장하지 않는다.
+- 프론트엔드는 탭 단위 `thread_id`와 최근 대화 최대 4개를 요청에 포함한다.
 - 근거 부족은 시스템 오류가 아니므로 HTTP 200과 `status: "insufficient_pdf_evidence"`로 반환한다.
 - 인덱스 없음, 요청 형식 오류, OpenAI 호출 실패 같은 실행 문제는 HTTP 오류 응답으로 반환한다.
 
@@ -167,13 +171,15 @@ MVP에는 공식 출처 검색을 위한 확장 지점만 둔다. 실제 검색 
 }
 ```
 
-### `POST /chat`
+### `POST /api/v1/chat`
 
 요청 예시:
 
 ```json
 {
-  "question": "청년수당 카드는 어디에서 사용할 수 있나요?"
+  "question": "청년수당 카드는 어디에서 사용할 수 있나요?",
+  "thread_id": "browser-tab-uuid",
+  "history": []
 }
 ```
 
@@ -209,13 +215,25 @@ MVP에는 공식 출처 검색을 위한 확장 지점만 둔다. 실제 검색 
 }
 ```
 
-오류 응답은 HTTP 상태 코드와 `{ "error": "...", "message": "..." }` 형태를 사용한다.
+오류 응답은 HTTP 상태 코드와 `{ "code": "...", "message": "..." }` 형태를 사용한다.
+
+### `POST /api/v1/chat/stream`
+
+요청 예시는 `/api/v1/chat`과 동일하다. 응답은 `text/event-stream` 형식을 사용한다.
+
+```text
+event: token
+data: {"text":"청년수당은 "}
+
+event: done
+data: {"answer":"청년수당은 안내책자 근거에 따라 사용할 수 있습니다.","sources":[],"status":"answered_from_pdf","needs_external_search":false,"intent":"rag"}
+```
 
 예시:
 
 ```json
 {
-  "error": "index_missing",
+  "code": "index_missing",
   "message": "PDF 인덱스가 없습니다. 먼저 indexing 명령을 실행하세요."
 }
 ```
@@ -227,10 +245,10 @@ MVP에는 공식 출처 검색을 위한 확장 지점만 둔다. 실제 검색 
 - `answered_from_pdf`: 충분한 PDF 근거로 답변을 생성했다.
 - `insufficient_pdf_evidence`: 신뢰할 수 있는 답변을 만들 만큼 PDF 근거가 충분하지 않다.
 
-오류 응답의 `error` 값은 실행 실패 원인을 나타낸다.
+오류 응답의 `code` 값은 실행 실패 원인을 나타낸다.
 
 - `invalid_request`: 요청 형식이 잘못되었다.
-- `index_missing`: 로컬 Chroma 인덱스가 없거나 로드할 수 없다.
+- `index_missing`: FAISS 인덱스와 BM25 fallback용 PDF 텍스트를 모두 사용할 수 없다.
 - `generation_error`: OpenAI 또는 런타임 문제로 답변 생성에 실패했다.
 - `indexing_error`: PDF indexing 과정에서 실패했다.
 
@@ -239,7 +257,10 @@ MVP에는 공식 출처 검색을 위한 확장 지점만 둔다. 실제 검색 
 - 화면에는 주민등록번호, 계좌번호, 전화번호, 개인 금융정보 등 민감정보를 입력하지 말라는 안내를 표시한다.
 - 백엔드는 `.env` 값을 로그로 출력하지 않는다.
 - OpenAI API key와 LangSmith API key를 출력하지 않는다.
+- 질문, 대화 history, 답변, 검색 source 본문을 기본 애플리케이션 로그에 기록하지 않는다.
 - LangSmith 추적이 켜져 있으면 질문/답변 텍스트가 추적에 남을 수 있으므로 민감정보 입력 방지 안내가 필요하다.
+- 배포 전 LangSmith 입력·출력 마스킹과 reverse proxy request/response body logging
+  비활성화를 확인한다.
 - 답변 프롬프트는 검색 근거 밖의 추측을 금지해야 한다.
 
 ## 13. 성공 기준

@@ -36,6 +36,20 @@ def test_validate_indexing_stats_rejects_low_text_pdf() -> None:
         validate_indexing_stats(stats)
 
 
+def test_collect_stats_does_not_include_source_content() -> None:
+    sensitive_text = "주민등록번호와 계좌번호가 포함될 수 있는 원문"
+    page = Document(page_content=sensitive_text, metadata={"page": 0})
+    chunk = Document(
+        page_content=sensitive_text,
+        metadata={"page": 1, "chunk_id": "pdf-page-1-chunk-0"},
+    )
+
+    stats = indexing_module.collect_stats([page], [chunk])
+
+    assert stats.sample_chunks == ["page=1 chunk_id=pdf-page-1-chunk-0"]
+    assert sensitive_text not in "\n".join(stats.sample_chunks)
+
+
 def test_load_pdf_pages_uses_ocr_when_pypdf_extracts_no_text(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

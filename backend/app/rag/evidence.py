@@ -10,9 +10,7 @@ from app.graph.state import EvidenceDecision
 from app.rag.generation import format_context
 from app.rag.policy import (
     is_food_delivery_question,
-    is_study_device_question,
     supports_food_delivery_inference,
-    supports_study_device_inference,
 )
 from app.rag.prompts import EVIDENCE_GRADER_SYSTEM_PROMPT, EVIDENCE_GRADER_USER_PROMPT
 
@@ -118,32 +116,6 @@ def grade_evidence(
             is_sufficient=False,
             support_level="insufficient",
             reason="배달앱 결제를 판단하는 데 필요한 식비/생활비 및 온라인 카드 결제 근거가 검색 후보에 없습니다.",
-            source_chunk_ids=[],
-        )
-
-    if is_study_device_question(question):
-        valid_documents = [
-            document for document in documents if supports_study_device_inference(document)
-        ]
-        if valid_documents:
-            return EvidenceDecision(
-                is_sufficient=True,
-                support_level="inferable",
-                reason=(
-                    "태블릿 PC, 노트북, 의자 등은 인터넷강의 청취, 공부, 면접 준비처럼 "
-                    "청년수당 사업 취지에 부합하는 경우 구입 가능하다는 근거가 있어 "
-                    "학습·구직활동용 기기나 도구는 고가 사치품이 아니라는 조건에서 제한적으로 답변할 수 있습니다."
-                ),
-                source_chunk_ids=[
-                    str(document.metadata["chunk_id"])
-                    for document in valid_documents[:2]
-                    if document.metadata.get("chunk_id")
-                ],
-            )
-        return EvidenceDecision(
-            is_sufficient=False,
-            support_level="insufficient",
-            reason="학습·구직활동용 기기/도구 구매를 판단하는 데 필요한 사업 취지 부합 및 고가 사치품 제한 근거가 검색 후보에 없습니다.",
             source_chunk_ids=[],
         )
 

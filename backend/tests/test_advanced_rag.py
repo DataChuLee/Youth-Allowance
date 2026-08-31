@@ -4,6 +4,7 @@ from app.graph.state import EvidenceDecision, IntentDecision, RetrievedDocument
 from app.graph.workflow import run_chat_graph
 from app.rag.evidence import grade_evidence
 from app.rag.intent import normalize_intent_decision
+from app.rag.policy import build_policy_evidence_queries
 from app.rag.query_planner import QueryPlan, build_search_queries
 from app.rag.retrieval import retrieve_with_queries
 
@@ -52,6 +53,12 @@ def test_build_search_queries_includes_original_and_deduplicates_planned_queries
         "청년수당 카드 사용 가능 항목 식비 생활비",
         "청년수당 간편결제 포인트 충전 상품권 기프티콘 사용 불가",
     ]
+
+
+def test_build_policy_evidence_queries_uses_canonical_secondhand_policy_terms() -> None:
+    queries = build_policy_evidence_queries("청년수당으로 중고거래를 해도 되나요?")
+
+    assert queries == ["청년수당 중고거래 증빙이 어려운 항목"]
 
 
 def test_retrieve_with_queries_interleaves_and_deduplicates_ensemble_results() -> None:
@@ -172,23 +179,15 @@ def test_run_chat_graph_returns_policy_blocked_answer_with_blocked_status() -> N
     )
 
     def fake_retrieve(query: str) -> list[RetrievedDocument]:
-        assert query == "청년수당 간편결제 불가"
+        assert "카카오페이" in query
+        assert "간편결제 불가" in query
         return [blocked_document]
 
     def fake_grade(
         question: str,
         documents: list[Document],
     ) -> EvidenceDecision:
-        assert question == "청년수당으로 카카오페이 결제해도 돼?"
-        assert [document.metadata["chunk_id"] for document in documents] == [
-            "chunk-blocked"
-        ]
-        return EvidenceDecision(
-            is_sufficient=True,
-            support_level="direct",
-            reason="간편결제 불가 근거가 확인됩니다.",
-            source_chunk_ids=["chunk-blocked"],
-        )
+        raise AssertionError("명시적 정책 제한은 LLM grader를 호출하지 않아야 합니다.")
 
     response = run_chat_graph(
         "청년수당으로 카카오페이 결제해도 돼?",
@@ -206,3 +205,60 @@ def test_run_chat_graph_returns_policy_blocked_answer_with_blocked_status() -> N
     assert response.needs_external_search is False
     assert "간편결제" in response.answer
     assert response.sources[0].chunk_id == "chunk-blocked"
+
+
+def test_run_chat_graph_blocks_explicit_policy_rule_before_llm_evidence_grading() -> None:
+    blocked_document = make_retrieved_document(
+        "chunk-secondhand",
+        "중고거래는 증빙이 어려운 항목으로 사용 불가합니다.",
+    )
+
+    def fake_retrieve(_: str) -> list[RetrievedDocument]:
+        return [blocked_document]
+
+    def fail_grade(_: str, __: list[Document]) -> EvidenceDecision:
+        raise AssertionError("명시적 정책 제한은 LLM 근거 평가 이전에 차단해야 합니다.")
+
+    response = run_chat_graph(
+        "청년수당으로 중고거래를 해도 되나요?",
+        classify_intent=lambda _: IntentDecision(intent="rag", reason="policy question"),
+        plan_search_queries=lambda question: [question],
+        retrieve_documents=fake_retrieve,
+        grade_evidence=fail_grade,
+    )
+
+    assert response.status == "blocked_by_policy"
+    assert response.sources[0].chunk_id == "chunk-secondhand"
+
+
+def test_run_chat_graph_skips_query_planner_for_explicit_policy_rule(monkeypatch) -> None:
+    blocked_document = make_retrieved_document(
+        "chunk-easy-payment",
+        "카카오페이, 네이버페이 등 간편결제 불가",
+    )
+
+    def fail_query_planner(_: str) -> list[str]:
+        raise AssertionError("명시적 제한 질문은 LLM query planner를 호출하지 않아야 합니다.")
+
+    def fail_grade(_: str, __: list[Document]) -> EvidenceDecision:
+        raise AssertionError("명시적 정책 제한은 LLM grader를 호출하지 않아야 합니다.")
+
+    class DisabledCache:
+        def get(self, _: str):
+            return None
+
+        def set(self, _: str, __: list[RetrievedDocument]) -> None:
+            return None
+
+    # 실행 환경의 Redis에 남은 이전 검색 결과가 테스트 흐름에 개입하지 않도록 격리한다.
+    monkeypatch.setattr("app.graph.workflow.get_query_cache", lambda: DisabledCache())
+
+    response = run_chat_graph(
+        "청년수당으로 카카오페이 결제가 가능한가요?",
+        classify_intent=lambda _: IntentDecision(intent="rag", reason="policy question"),
+        plan_search_queries=fail_query_planner,
+        retrieve_documents=lambda _: [blocked_document],
+        grade_evidence=fail_grade,
+    )
+
+    assert response.status == "blocked_by_policy"

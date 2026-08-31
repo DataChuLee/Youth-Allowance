@@ -16,8 +16,11 @@ export function SourceList({
       {status === "blocked_by_policy" ? (
         <div className="source-label">사용 제한 근거</div>
       ) : null}
-      {sources.map((source) => (
-        <SourceItem key={source.chunk_id} source={source} />
+      {sources.map((source, index) => (
+        <SourceItem
+          key={`${source.type}-${source.chunk_id}-${source.page}-${source.title}-${index}`}
+          source={source}
+        />
       ))}
     </div>
   );

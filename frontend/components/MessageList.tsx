@@ -1,10 +1,16 @@
+import { useEffect, useState } from "react";
 import type { ChatResponse } from "../lib/types";
 import { AnswerContent } from "./AnswerContent";
 import { SourceList } from "./SourceList";
 
 export type ChatMessage =
   | { role: "user"; content: string }
-  | { role: "assistant"; content: string; response: ChatResponse };
+  | {
+      role: "assistant";
+      content: string;
+      response?: ChatResponse;
+      isStreaming?: boolean;
+    };
 
 export function MessageList({
   isLoading = false,
@@ -14,6 +20,9 @@ export function MessageList({
   messages: ChatMessage[];
 }) {
   const loadingMessage = getLoadingMessage(getLatestUserQuestion(messages));
+  const hasEmptyStreamingAssistant = messages.some(
+    (message) => message.role === "assistant" && message.isStreaming && !message.content,
+  );
 
   if (messages.length === 0) {
     return (
@@ -28,31 +37,84 @@ export function MessageList({
 
   return (
     <div className="message-list">
-      {messages.map((message, index) => (
-        <div className={`message ${message.role}`} key={`${message.role}-${index}`}>
-          {message.role === "assistant" ? (
-            <>
-              <AnswerContent content={message.content} />
-              <SourceList
-                sources={message.response.sources}
-                status={message.response.status}
-              />
-            </>
-          ) : (
-            <p>{message.content}</p>
-          )}
-        </div>
-      ))}
-      {isLoading ? (
+      {messages.map((message, index) => {
+        const isStreamingPlaceholder =
+          message.role === "assistant" && message.isStreaming && !message.content;
+
+        return (
+          <div
+            aria-live={isStreamingPlaceholder ? "polite" : undefined}
+            className={`message ${message.role}${isStreamingPlaceholder ? " loading" : ""}`}
+            key={`${message.role}-${index}`}
+            role={isStreamingPlaceholder ? "status" : undefined}
+          >
+            {message.role === "assistant" ? (
+              <>
+                {message.content ? (
+                  <AnswerContent content={message.content} />
+                ) : message.isStreaming ? (
+                  <LoadingContent message={loadingMessage} />
+                ) : null}
+                {message.response ? (
+                  <SourceList
+                    sources={message.response.sources}
+                    status={message.response.status}
+                  />
+                ) : null}
+              </>
+            ) : (
+              <p>{message.content}</p>
+            )}
+          </div>
+        );
+      })}
+      {isLoading && !hasEmptyStreamingAssistant ? (
         <div aria-live="polite" className="message assistant loading" role="status">
-          <span className="loading-dots" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </span>
-          <p>{loadingMessage}</p>
+          <LoadingContent message={loadingMessage} />
         </div>
       ) : null}
+    </div>
+  );
+}
+
+const LOADING_STAGES = [
+  { label: "질문을 분석하고 있습니다", duration: 2000 },
+  { label: "관련 내용을 검색하고 있습니다", duration: 3000 },
+];
+
+function LoadingContent({ message }: { message: string }) {
+  const [stageIndex, setStageIndex] = useState(0);
+  const [completedStages, setCompletedStages] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (stageIndex >= LOADING_STAGES.length) return;
+
+    const timer = setTimeout(() => {
+      setCompletedStages((prev) => [...prev, LOADING_STAGES[stageIndex].label]);
+      setStageIndex((prev) => prev + 1);
+    }, LOADING_STAGES[stageIndex].duration);
+
+    return () => clearTimeout(timer);
+  }, [stageIndex]);
+
+  const currentMessage =
+    stageIndex < LOADING_STAGES.length ? LOADING_STAGES[stageIndex].label : message;
+
+  return (
+    <div className="loading-content">
+      {completedStages.map((stage, index) => (
+        <p key={index} className="loading-stage-done">
+          ✓ {stage}
+        </p>
+      ))}
+      <div className="loading-current">
+        <span className="loading-dots" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </span>
+        <p>{currentMessage}</p>
+      </div>
     </div>
   );
 }
