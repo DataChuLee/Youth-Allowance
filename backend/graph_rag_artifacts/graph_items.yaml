@@ -1,0 +1,879 @@
+version: 1
+description: Manual Graph RAG policy items curated from policy_blocks.json.
+items:
+  - id: card.payment_method.check_card_required
+    label: 청년수당 지원금 체크카드 사용 원칙
+    node_label: PolicyRule
+    decision: required
+    source_block_id: ocr-page-12-block-0
+    evidence_text: "청년수당 지원금은 반드시 체크카드로 사용해야 합니다."
+    properties:
+      intent: card_usage
+      rule_type: require_payment_method
+      support_level: direct
+    relationships:
+      - type: ALLOWED_BY_METHOD
+        target_label: PaymentMethod
+        target_key: method_check_card
+        target_name: 체크카드
+        properties:
+          condition: 청년수당 지원금은 전용 체크카드로 사용해야 함
+
+  - id: card.online_card_payment.allowed
+    label: 온라인 카드 결제 허용
+    node_label: PolicyRule
+    decision: allowed
+    source_block_id: ocr-page-12-block-0
+    evidence_text: "오프라인은 물론 온라인에서도 카드 결제로 사용할 수 있습니다."
+    properties:
+      intent: card_usage
+      rule_type: allow
+      support_level: direct
+    relationships:
+      - type: ALLOWED_BY_METHOD
+        target_label: PaymentMethod
+        target_key: method_online_card
+        target_name: 온라인 카드 결제
+        properties:
+          condition: 사용 목적에 맞게 체크카드로 결제한 경우
+
+  - id: card.simple_payment.blocked
+    label: 간편결제 사용 불가
+    node_label: PolicyRule
+    decision: blocked
+    source_block_id: ocr-page-12-block-0
+    evidence_text: "단 카카오페이, 네이버페이 등 간편 결제 불가"
+    properties:
+      intent: card_usage
+      rule_type: block
+      support_level: direct
+      examples:
+        - 카카오페이
+        - 네이버페이
+    relationships:
+      - type: PROHIBITED_BY_METHOD
+        target_label: PaymentMethod
+        target_key: method_simple_payment
+        target_name: 간편결제
+        properties:
+          reason: 카카오페이, 네이버페이 등 간편 결제 불가
+
+  - id: spending.housing.allowed
+    label: 주거비 사용 가능
+    node_label: PolicyRule
+    decision: allowed
+    source_block_id: ocr-page-12-block-0
+    evidence_text: "사용 예 | 주거비 | 월세, 관리비, 공과금(세금 및 연금 제외), 주거 관련 대출 원금 및 이자 등"
+    properties:
+      intent: card_usage
+      rule_type: allow
+      support_level: direct
+    relationships:
+      - type: ALLOWS
+        target_label: SpendingCategory
+        target_key: category_housing
+        target_name: 주거비
+        properties:
+          examples:
+            - 월세
+            - 관리비
+            - 공과금
+            - 주거 관련 대출 원금 및 이자
+
+  - id: spending.living.allowed
+    label: 생활비 사용 가능
+    node_label: PolicyRule
+    decision: allowed
+    source_block_id: ocr-page-12-block-1
+    evidence_text: "생활비 | 식비, 통신비(소액결제 제외), 교통비 (해외 항공권 제외), 건강보험료 등"
+    properties:
+      intent: card_usage
+      rule_type: allow
+      support_level: direct
+    relationships:
+      - type: ALLOWS
+        target_label: SpendingCategory
+        target_key: category_living
+        target_name: 생활비
+        properties:
+          examples:
+            - 식비
+            - 통신비
+            - 교통비
+            - 건강보험료
+
+  - id: spending.education_job.allowed
+    label: 교육비와 구직활동비 사용 가능
+    node_label: PolicyRule
+    decision: allowed
+    source_block_id: ocr-page-12-block-1
+    evidence_text: "교육비·구직활동비 | 학원비, 도서 구매비, 시험 응시료, 면접 복장 구매 및 대여비, 학자금대출 원금 및 이자, 생성형 AI 구독료 등"
+    properties:
+      intent: card_usage
+      rule_type: allow
+      support_level: direct
+    relationships:
+      - type: ALLOWS
+        target_label: SpendingCategory
+        target_key: category_education_job
+        target_name: 교육비·구직활동비
+        properties:
+          examples:
+            - 학원비
+            - 도서 구매비
+            - 시험 응시료
+            - 면접 복장 구매 및 대여비
+            - 학자금대출 원금 및 이자
+            - 생성형 AI 구독료
+
+  - id: spending.clean_card.blocked_categories
+    label: 클린카드 사용 불가 업종 제한
+    node_label: PolicyRule
+    decision: blocked
+    source_block_id: ocr-page-12-block-1
+    evidence_text: "사용 불가 항목 클린카드 사용 불가 업종에 대한 지출 ◆ 호텔, 주점, 복권 판매, 피부미용, 마사지 등 48개 업종"
+    properties:
+      intent: card_usage
+      rule_type: block
+      support_level: direct
+      examples:
+        - 호텔
+        - 주점
+        - 복권 판매
+        - 피부미용
+        - 마사지
+        - 상품권판매
+    relationships:
+      - type: PROHIBITS
+        target_label: Restriction
+        target_key: restriction_clean_card_blocked_category
+        target_name: 클린카드 사용 불가 업종
+        properties:
+          reason: 클린카드 제한 업종에서는 카드 결제 불가
+
+  - id: spending.asset_accumulation.blocked
+    label: 자산 운영·축적 및 투자 지출 불가
+    node_label: PolicyRule
+    decision: blocked
+    source_block_id: ocr-page-12-block-2
+    evidence_text: "예금, 적금, 세금 납부, 보험료 납부, 국민연금 납부, 상품권(기프티콘 포함) 구매, 결제 포인트 구매, 충전식 결제, 신용카드 대금 납부, 일반대출 상환"
+    properties:
+      intent: card_usage
+      rule_type: block
+      support_level: direct
+    relationships:
+      - type: PROHIBITS
+        target_label: Restriction
+        target_key: restriction_asset_accumulation
+        target_name: 자산 운영·축적 및 투자 지출
+        properties:
+          examples:
+            - 예금
+            - 적금
+            - 상품권 구매
+            - 결제 포인트 구매
+            - 충전식 결제
+            - 신용카드 대금 납부
+            - 일반대출 상환
+
+  - id: spending.social_order.blocked
+    label: 사회 정서상 허용되기 어려운 지출 불가
+    node_label: PolicyRule
+    decision: blocked
+    source_block_id: ocr-page-12-block-2
+    evidence_text: "기타 사회 정서에 반하는 지출 도박·게임 등 사행성 분야에 대한 지출, 유흥비, 진로 탐색 및 구직활동과 무관한 고가의 사치품 구매나 고액의 서비스 이용"
+    properties:
+      intent: card_usage
+      rule_type: block
+      support_level: direct
+    relationships:
+      - type: PROHIBITS
+        target_label: Restriction
+        target_key: restriction_social_order
+        target_name: 사회 정서상 허용되기 어려운 지출
+        properties:
+          examples:
+            - 도박
+            - 게임 등 사행성 분야
+            - 유흥비
+            - 고가 사치품
+            - 고액 서비스
+
+  - id: cash_transfer.general.conditional
+    label: 계좌이체는 특정 항목과 증빙 제출 시 인정
+    node_label: PolicyRule
+    decision: conditional
+    source_block_id: ocr-page-13-block-0
+    evidence_text: "현금 사용(계좌이체)은 주거비, 생활공과금, 교육비 등 3개 항목에서 증빙서류를 제출한 경우에만 인정됩니다."
+    properties:
+      intent: cash_transfer
+      rule_type: conditional_allow
+      support_level: direct
+      condition: 주거비, 생활공과금, 교육비 등 특정 항목에서 증빙서류 제출 시 인정
+    relationships:
+      - type: ALLOWED_BY_METHOD
+        target_label: PaymentMethod
+        target_key: method_cash_transfer
+        target_name: 계좌이체
+        properties:
+          condition: 특정 항목에 한하여 증빙 제출 시 인정
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_cash_transfer_evidence
+        target_name: 현금 사용 증빙서류
+        properties:
+          minimum_count: 2
+
+  - id: cash_withdrawal.blocked
+    label: 현금인출 불가
+    node_label: PolicyRule
+    decision: blocked
+    source_block_id: ocr-page-13-block-0
+    evidence_text: "현금 사용이란 계좌이체를 말하며, 현금인출은 불가합니다."
+    properties:
+      intent: cash_transfer
+      rule_type: block
+      support_level: direct
+    relationships:
+      - type: PROHIBITED_BY_METHOD
+        target_label: PaymentMethod
+        target_key: method_cash_withdrawal
+        target_name: 현금인출
+        properties:
+          reason: 현금 사용은 계좌이체만 의미하며 현금인출은 불가
+
+  - id: cash_transfer.missing_evidence.penalty
+    label: 현금 증빙 미흡 시 환수 또는 지급 중단
+    node_label: PolicyRule
+    decision: restricted
+    source_block_id: ocr-page-13-block-0
+    evidence_text: "증빙이 미흡한 경우 지원금 환수 또는 지급 중단될 수 있으니 증빙서류를 꼭 제출해야 합니다."
+    properties:
+      intent: cash_transfer
+      rule_type: penalty
+      support_level: direct
+      condition: 현금 사용 증빙 미흡 또는 허위 서류 제출
+    relationships:
+      - type: VIOLATION_CAUSES
+        target_label: Penalty
+        target_key: penalty_recovery_or_payment_stop
+        target_name: 지원금 환수 또는 지급 중단
+        properties:
+          reason: 증빙 미흡, 허위 서류, 증빙 미제출
+
+  - id: cash_transfer.rent.evidence
+    label: 월세 계좌이체 증빙서류
+    node_label: PolicyRule
+    decision: conditional
+    source_block_id: ocr-page-13-block-1
+    evidence_text: "주거비 | 월세 | ① 임대차계약서 | ② 이체확인증 | ③주민등록등본(해당자만)"
+    properties:
+      intent: cash_transfer
+      rule_type: require_evidence
+      support_level: direct
+    relationships:
+      - type: ALLOWS
+        target_label: SpendingItem
+        target_key: item_rent
+        target_name: 월세
+        properties:
+          condition: 계좌이체 후 필수 증빙서류 제출
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_lease_contract
+        target_name: 임대차계약서
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_transfer_confirmation
+        target_name: 이체확인증
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_resident_registration
+        target_name: 주민등록등본
+        properties:
+          condition: 해당자만
+
+  - id: cash_transfer.management_fee.evidence
+    label: 관리비 계좌이체 증빙서류
+    node_label: PolicyRule
+    decision: conditional
+    source_block_id: ocr-page-13-block-1
+    evidence_text: "주거비 | 관리비 | ①고지서(임대차계약서에 관리비 조항이 있을 경우 임대차계약서 제출 가능) | ② 이체확인증 | ③ 주민등록등본(해당자만)"
+    properties:
+      intent: cash_transfer
+      rule_type: require_evidence
+      support_level: direct
+    relationships:
+      - type: ALLOWS
+        target_label: SpendingItem
+        target_key: item_management_fee
+        target_name: 관리비
+        properties:
+          condition: 계좌이체 후 필수 증빙서류 제출
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_bill
+        target_name: 고지서
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_transfer_confirmation
+        target_name: 이체확인증
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_resident_registration
+        target_name: 주민등록등본
+        properties:
+          condition: 해당자만
+
+  - id: cash_transfer.utility_bill.evidence
+    label: 공과금 계좌이체 증빙서류
+    node_label: PolicyRule
+    decision: conditional
+    source_block_id: ocr-page-13-block-1
+    evidence_text: "주거비 | 공과금 | ①고지서 | ② 이체확인증"
+    properties:
+      intent: cash_transfer
+      rule_type: require_evidence
+      support_level: direct
+    relationships:
+      - type: ALLOWS
+        target_label: SpendingItem
+        target_key: item_utility_bill
+        target_name: 공과금
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_bill
+        target_name: 고지서
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_transfer_confirmation
+        target_name: 이체확인증
+
+  - id: cash_transfer.housing_loan.evidence
+    label: 주거 관련 대출 계좌이체 증빙서류
+    node_label: PolicyRule
+    decision: conditional
+    source_block_id: ocr-page-13-block-1
+    evidence_text: "주거비 | 주거 관련 대출 (원금 및 이자) | ①대출거래약정서 | ② 이체확인증"
+    properties:
+      intent: cash_transfer
+      rule_type: require_evidence
+      support_level: direct
+    relationships:
+      - type: ALLOWS
+        target_label: SpendingItem
+        target_key: item_housing_loan
+        target_name: 주거 관련 대출 원금 및 이자
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_loan_agreement
+        target_name: 대출거래약정서
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_transfer_confirmation
+        target_name: 이체확인증
+
+  - id: cash_transfer.phone_bill.evidence
+    label: 통신비 계좌이체 증빙서류
+    node_label: PolicyRule
+    decision: conditional
+    source_block_id: ocr-page-13-block-1
+    evidence_text: "생활비 | 통신비 | ①고지서(상세) | ② 이체확인증"
+    properties:
+      intent: cash_transfer
+      rule_type: require_evidence
+      support_level: direct
+    relationships:
+      - type: ALLOWS
+        target_label: SpendingItem
+        target_key: item_phone_bill
+        target_name: 통신비
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_detailed_bill
+        target_name: 고지서(상세)
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_transfer_confirmation
+        target_name: 이체확인증
+
+  - id: cash_transfer.student_loan.evidence
+    label: 학자금대출 계좌이체 증빙서류
+    node_label: PolicyRule
+    decision: conditional
+    source_block_id: ocr-page-13-block-1
+    evidence_text: "교육비·구직활동비 | 학자금 대출 (원금 및 이자) | ①대출거래약정서 | ② 이체확인증"
+    properties:
+      intent: cash_transfer
+      rule_type: require_evidence
+      support_level: direct
+    relationships:
+      - type: ALLOWS
+        target_label: SpendingItem
+        target_key: item_student_loan
+        target_name: 학자금 대출 원금 및 이자
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_loan_agreement
+        target_name: 대출거래약정서
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_transfer_confirmation
+        target_name: 이체확인증
+
+  - id: cash_transfer.exam_fee.evidence
+    label: 시험 응시료 계좌이체 증빙서류
+    node_label: PolicyRule
+    decision: conditional
+    source_block_id: ocr-page-13-block-1
+    evidence_text: "교육비·구직활동비 | 시험 응시료 | ①수험표 또는 접수확인서 | ② 이체확인증"
+    properties:
+      intent: cash_transfer
+      rule_type: require_evidence
+      support_level: direct
+    relationships:
+      - type: ALLOWS
+        target_label: SpendingItem
+        target_key: item_exam_fee
+        target_name: 시험 응시료
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_exam_ticket_or_registration
+        target_name: 수험표 또는 접수확인서
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_transfer_confirmation
+        target_name: 이체확인증
+
+  - id: cash_transfer.overseas_ai.evidence
+    label: 해외 생성형 AI 프로그램 구독료 계좌이체 증빙서류
+    node_label: PolicyRule
+    decision: conditional
+    source_block_id: ocr-page-13-block-1
+    evidence_text: "교육비·구직활동비 | 해외 생성형 AI 프로그램 구독료 | ①거래명세서 또는 영수증 | ② 이체확인증 (청년수당 계좌 · 본인 계좌)"
+    properties:
+      intent: cash_transfer
+      rule_type: require_evidence
+      support_level: direct
+      condition: 개인이 보유한 카드로 결제한 내역과 실 지출 금액 확인 가능 서류 구비
+    relationships:
+      - type: ALLOWS
+        target_label: SpendingItem
+        target_key: item_overseas_generative_ai_subscription
+        target_name: 해외 생성형 AI 프로그램 구독료
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_transaction_statement_or_receipt
+        target_name: 거래명세서 또는 영수증
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_transfer_confirmation
+        target_name: 이체확인증
+
+  - id: evidence.lease_contract.required_fields
+    label: 임대차계약서 필수 포함 내용
+    node_label: PolicyRule
+    decision: required
+    source_block_id: ocr-page-14-block-0
+    evidence_text: "임대차 계약서 - ■ 계약자(임대인 및 임차인) 정보"
+    properties:
+      intent: evidence_documents
+      rule_type: document_required_fields
+      support_level: direct
+    relationships:
+      - type: MUST_INCLUDE
+        target_label: RequiredField
+        target_key: field_lease_parties
+        target_name: 계약자 정보
+
+  - id: report.self_growth.monthly_required
+    label: 자기성장기록서 매월 제출 의무
+    node_label: PolicyRule
+    decision: required
+    source_block_id: ocr-page-20-block-0
+    evidence_text: "매달 한 번, 주어진 기간 내에 제출하면 됩니다. 미제출 시 다음 회차부터 지원금 지급이 중단됩니다"
+    properties:
+      intent: self_growth_report
+      rule_type: require_report
+      support_level: direct
+    relationships:
+      - type: REQUIRES_EVIDENCE
+        target_label: Report
+        target_key: report_self_growth
+        target_name: 자기성장기록서
+      - type: VIOLATION_CAUSES
+        target_label: Penalty
+        target_key: penalty_next_round_payment_stop
+        target_name: 다음 회차부터 지원금 지급 중단
+
+  - id: report.self_growth.deadline
+    label: 자기성장기록서 작성 기간
+    node_label: PolicyRule
+    decision: required
+    source_block_id: ocr-page-20-block-0
+    evidence_text: "자기성장기록서는 매월 11일 ~ 다음달 10일까지 작성 및 제출 가능합니다."
+    properties:
+      intent: self_growth_report
+      rule_type: deadline
+      support_level: direct
+    relationships:
+      - type: HAS_DEADLINE
+        target_label: Deadline
+        target_key: deadline_self_growth_monthly
+        target_name: 매월 11일 ~ 다음달 10일
+
+  - id: report.cash_transfer.report_required
+    label: 현금 사용 내역 보고 의무
+    node_label: PolicyRule
+    decision: required
+    source_block_id: ocr-page-20-block-4
+    evidence_text: "⑤ 현금 사용(계좌이체) 내역 보고"
+    properties:
+      intent: self_growth_report
+      rule_type: require_report
+      support_level: direct
+    relationships:
+      - type: REQUIRES_EVIDENCE
+        target_label: Report
+        target_key: report_cash_transfer_usage
+        target_name: 현금 사용 내역 보고
+
+  - id: short_term_worker.contract.monthly_required
+    label: 단기근로자 근로계약서 매월 제출
+    node_label: PolicyRule
+    decision: required
+    source_block_id: ocr-page-22-block-0
+    evidence_text: "단기근로자는 자기성장기록서에 \"매월\" 근로계약서를 첨부해야 해요."
+    properties:
+      intent: self_growth_report
+      rule_type: require_evidence
+      support_level: direct
+    relationships:
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_employment_contract
+        target_name: 근로계약서
+
+  - id: monitoring.supplement_noncompliance.penalty
+    label: 보완 요청 불응 시 지급 중단
+    node_label: PolicyRule
+    decision: restricted
+    source_block_id: ocr-page-23-block-0
+    evidence_text: "보완 요청에 불응하면 이후 청년수당 지원금 지급이 중단될 수 있습니다."
+    properties:
+      intent: monitoring
+      rule_type: penalty
+      support_level: direct
+    relationships:
+      - type: VIOLATION_CAUSES
+        target_label: Penalty
+        target_key: penalty_payment_stop_after_noncompliance
+        target_name: 이후 청년수당 지원금 지급 중단
+
+  - id: restoration.blocked_spending.restore_required
+    label: 사용 불가 항목 지출 시 불인정 금액 복원
+    node_label: PolicyRule
+    decision: required
+    source_block_id: ocr-page-24-block-0
+    evidence_text: "사용할 수 없는 항목에 지원금을 사용한 내역이 확인되면 지원금 복원을 요청받게 됩니다."
+    properties:
+      intent: monitoring
+      rule_type: remediation
+      support_level: direct
+    relationships:
+      - type: VIOLATION_CAUSES
+        target_label: Penalty
+        target_key: penalty_restore_disallowed_amount
+        target_name: 불인정 금액 복원
+      - type: REQUIRES_EVIDENCE
+        target_label: EvidenceDocument
+        target_key: doc_restore_transfer_confirmation
+        target_name: 복원 이체확인증
+
+  - id: extension.self_growth.exception
+    label: 자기성장기록서 제출 기한 연장 예외
+    node_label: PolicyRule
+    decision: conditional
+    source_block_id: ocr-page-24-block-0
+    evidence_text: "자기성장기록서 제출 기한 연장(예외적 허용) - ■ 연장 조건 : 불가피한 사유 발생 시 증빙자료 제출을 통해 기한 연장 가능"
+    properties:
+      intent: self_growth_report
+      rule_type: exception
+      support_level: direct
+      condition: 불가피한 사유 발생 시 증빙자료 제출
+    relationships:
+      - type: HAS_EXCEPTION
+        target_label: ExceptionRule
+        target_key: exception_self_growth_deadline_extension
+        target_name: 자기성장기록서 제출 기한 연장
+
+  - id: extension.self_growth.accepted_reasons
+    label: 제출 기한 연장 인정 사유
+    node_label: PolicyRule
+    decision: conditional
+    source_block_id: ocr-page-24-block-1
+    evidence_text: "인정 사유 : 본인의 수술 ·입원 또는 직계가족·배우자·형제자매의 사망"
+    properties:
+      intent: self_growth_report
+      rule_type: exception_condition
+      support_level: direct
+    relationships:
+      - type: HAS_EXCEPTION
+        target_label: ExceptionRule
+        target_key: exception_self_growth_deadline_extension
+        target_name: 자기성장기록서 제출 기한 연장
+
+  - id: carryover.reason_required
+    label: 지원금 이월 시 이월사유 작성 필수
+    node_label: PolicyRule
+    decision: required
+    source_block_id: ocr-page-24-block-8
+    evidence_text: "이월이 필요한 경우, 자기성장기록서에 이월사유 작성란에 사유 작성"
+    properties:
+      intent: self_growth_report
+      rule_type: require_report_field
+      support_level: direct
+    relationships:
+      - type: REQUIRES_EVIDENCE
+        target_label: RequiredField
+        target_key: field_carryover_reason
+        target_name: 이월사유
+
+  - id: eligibility_loss.report_immediate
+    label: 자격상실 사유 발생 시 즉시 신고
+    node_label: PolicyRule
+    decision: required
+    source_block_id: ocr-page-9-block-0
+    evidence_text: "하나라도 해당될 경우, 참여 자격이 상실됩니다. 사유 발생 시에는 즉시 신고해야 합니다."
+    properties:
+      intent: eligibility_loss
+      rule_type: require_report
+      support_level: direct
+    relationships:
+      - type: REQUIRES_EVIDENCE
+        target_label: Report
+        target_key: report_eligibility_loss
+        target_name: 자격상실신고서
+
+  - id: eligibility_loss.reasons
+    label: 자격상실 사유
+    node_label: PolicyRule
+    decision: restricted
+    source_block_id: ocr-page-9-block-1
+    evidence_text: "진학, 타 시도로 거주지 이전, 입대, 중복 참여 불가 사업 참여"
+    properties:
+      intent: eligibility_loss
+      rule_type: eligibility_loss_reasons
+      support_level: direct
+      reasons:
+        - 취·창업
+        - 진학
+        - 타 시도로 거주지 이전
+        - 입대
+        - 중복 참여 불가 사업 참여
+    relationships:
+      - type: RESTRICTS
+        target_label: Restriction
+        target_key: restriction_eligibility_loss
+        target_name: 자격상실 사유
+
+  - id: eligibility_loss.late_report.user_responsibility
+    label: 자격상실 신고 지연 책임
+    node_label: PolicyRule
+    decision: restricted
+    source_block_id: ocr-page-9-block-2
+    evidence_text: "자격 상실 신고를 늦게 해서 발생하는 피해는 참여자 본인의 책임입니다."
+    properties:
+      intent: eligibility_loss
+      rule_type: caution
+      support_level: direct
+    relationships:
+      - type: VIOLATION_CAUSES
+        target_label: Penalty
+        target_key: penalty_late_eligibility_loss_report
+        target_name: 자격상실 신고 지연 피해
+
+  - id: eligibility_loss.false_payment.recovery
+    label: 자격상실 미신고 부당수급 환수
+    node_label: PolicyRule
+    decision: blocked
+    source_block_id: ocr-page-9-block-3
+    evidence_text: "자격 상실 사유가 발생했음에도 신고하지 않고 지원금을 부당하게 받은 경우, 감독 기관의 자격요건 조회를 통해 해당 사실이 확인되면 지원금 전액이 환수될 수 있습니다."
+    properties:
+      intent: eligibility_loss
+      rule_type: penalty
+      support_level: direct
+    relationships:
+      - type: VIOLATION_CAUSES
+        target_label: Penalty
+        target_key: penalty_full_recovery
+        target_name: 지원금 전액 환수
+
+  - id: employment_success_payment.condition
+    label: 취업성공금 지급 조건
+    node_label: PolicyRule
+    decision: conditional
+    source_block_id: ocr-page-9-block-4
+    evidence_text: "청년수당 참여 중 취업(또는 창업)으로 자격상실신고 시 반드시 '취,창업'유형으로 체크해야 취업 성공금 지급 가능"
+    properties:
+      intent: employment_success_payment
+      rule_type: conditional_benefit
+      support_level: direct
+      condition: 취업 또는 창업 유형으로 자격상실신고 및 사업 참여 후기 작성
+    relationships:
+      - type: PROVIDES_BENEFIT
+        target_label: Benefit
+        target_key: benefit_employment_success_payment
+        target_name: 취업성공금
+
+  - id: employment_success_payment.amount
+    label: 취업성공금 금액 산정
+    node_label: PolicyRule
+    decision: conditional
+    source_block_id: ocr-page-9-block-4
+    evidence_text: "취업 성공금(남은 청년수당 지급분의 50%) 마지막 월 취업 시 잔여 1회분(50만원) 전액 지급"
+    properties:
+      intent: employment_success_payment
+      rule_type: amount_rule
+      support_level: direct
+    relationships:
+      - type: PROVIDES_BENEFIT
+        target_label: Benefit
+        target_key: benefit_employment_success_payment
+        target_name: 취업성공금
+
+  - id: employment_success_payment.deadline
+    label: 취업성공금 신고 기준일
+    node_label: PolicyRule
+    decision: conditional
+    source_block_id: ocr-page-9-block-4
+    evidence_text: "매월 10일까지 취업을 사유로 자격 상실 신고하면 당월 청년수당 지급일에 취업 성공금이 지급되며 11일 이후 신고하면 다음 달 청년수당 지급일에 취업 성공금이 지급됩니다."
+    properties:
+      intent: employment_success_payment
+      rule_type: deadline
+      support_level: direct
+    relationships:
+      - type: HAS_DEADLINE
+        target_label: Deadline
+        target_key: deadline_employment_success_report_10th
+        target_name: 매월 10일
+
+  - id: faq.tablet_laptop.conditional
+    label: 태블릿 PC와 노트북 조건부 구입 가능
+    node_label: PolicyRule
+    decision: conditional
+    source_block_id: ocr-page-31-block-0
+    evidence_text: "태블릿 PC, 노트북, 의자 등은 인터넷강의 청취, 공부, 면접 준비와 같이 청년수당 사업 취지에 부합하는 경우에 구입 가능하나 사회 정서에 반하는 고가의 사치품은 구입 제한됩니다."
+    properties:
+      intent: card_usage
+      rule_type: conditional_allow
+      support_level: direct
+      condition: 인터넷강의 청취, 공부, 면접 준비 등 사업 취지에 부합해야 함
+    relationships:
+      - type: ALLOWS
+        target_label: SpendingItem
+        target_key: item_study_device
+        target_name: 태블릿 PC·노트북·의자
+        properties:
+          condition: 사업 취지에 부합하고 고가 사치품이 아니어야 함
+
+  - id: account.personal_money.mix_blocked
+    label: 개인 돈과 청년수당 지원금 합산 사용 금지
+    node_label: PolicyRule
+    decision: blocked
+    source_block_id: ocr-page-31-block-1
+    evidence_text: "개인이 보유한 다른 계좌 또는 제3자 계좌의 돈과 청년수당 지원금을 합쳐서 사용하는 것은 금지입니다. (청년수당 전용통장, 전용 체크카드 사용)"
+    properties:
+      intent: account_card
+      rule_type: block
+      support_level: direct
+    relationships:
+      - type: PROHIBITS
+        target_label: Restriction
+        target_key: restriction_mixing_personal_money
+        target_name: 개인 돈과 청년수당 지원금 합산 사용
+
+  - id: faq.clean_card.blocked_categories
+    label: FAQ 사용불가 업종
+    node_label: PolicyRule
+    decision: blocked
+    source_block_id: ocr-page-31-block-1
+    evidence_text: "청년수당 S20 체크카드에는 클린카드 기능이 적용되어 아래 제한 업종에서는 카드 결제가 불가합니다. (48종)"
+    properties:
+      intent: card_usage
+      rule_type: block
+      support_level: direct
+    relationships:
+      - type: PROHIBITS
+        target_label: Restriction
+        target_key: restriction_clean_card_blocked_category
+        target_name: 클린카드 사용 불가 업종
+
+  - id: faq.self_growth.missing.penalty
+    label: FAQ 자기성장기록서 미작성 불이익
+    node_label: PolicyRule
+    decision: restricted
+    source_block_id: ocr-page-32-block-1
+    evidence_text: "자기성장기록서를 기한 내 제출하지 않으면 해당 월부터 청년수당 지급이 중단됩니다."
+    properties:
+      intent: self_growth_report
+      rule_type: penalty
+      support_level: direct
+    relationships:
+      - type: VIOLATION_CAUSES
+        target_label: Penalty
+        target_key: penalty_current_month_payment_stop
+        target_name: 해당 월부터 청년수당 지급 중단
+
+  - id: faq.eligibility_loss.report_timing
+    label: FAQ 자격상실신고 제출 시점
+    node_label: PolicyRule
+    decision: required
+    source_block_id: ocr-page-33-block-1
+    evidence_text: "자격상실 사유 발생 즉시 신고해야 합니다."
+    properties:
+      intent: eligibility_loss
+      rule_type: require_report
+      support_level: direct
+    relationships:
+      - type: REQUIRES_EVIDENCE
+        target_label: Report
+        target_key: report_eligibility_loss
+        target_name: 자격상실신고서
+
+  - id: faq.employment.criteria
+    label: FAQ 취업 기준
+    node_label: PolicyRule
+    decision: restricted
+    source_block_id: ocr-page-33-block-1
+    evidence_text: "자격 상실 사유에 해당하는 취업의 기준은 무엇인가요? - ① 주30시간 초과 그리고 3개월 초과 근로계약 체결한 경우"
+    properties:
+      intent: eligibility_loss
+      rule_type: employment_criteria
+      support_level: direct
+      condition: 주30시간 초과 그리고 3개월 초과 근로계약 체결
+    relationships:
+      - type: RESTRICTS
+        target_label: ExclusionCriterion
+        target_key: exclusion_employment_over_30_hours_over_3_months
+        target_name: 주30시간 초과 및 3개월 초과 근로계약
+
+  - id: faq.employment_success_payment.deadline
+    label: FAQ 취업성공금 지급일
+    node_label: PolicyRule
+    decision: conditional
+    source_block_id: ocr-page-33-block-2
+    evidence_text: "매월 10일까지 취업에 따른 자격상실신고 시 남은 청년수당 지원금의 절반이 취업성공금으로 지급됩니다."
+    properties:
+      intent: employment_success_payment
+      rule_type: deadline
+      support_level: direct
+    relationships:
+      - type: PROVIDES_BENEFIT
+        target_label: Benefit
+        target_key: benefit_employment_success_payment
+        target_name: 취업성공금
+      - type: HAS_DEADLINE
+        target_label: Deadline
+        target_key: deadline_employment_success_report_10th
+        target_name: 매월 10일
