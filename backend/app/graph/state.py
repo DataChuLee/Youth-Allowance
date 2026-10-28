@@ -13,20 +13,6 @@ class RetrievedDocument(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
 
-class GraphPolicyResult(BaseModel):
-    rule_id: str
-    rule_name: str
-    decision: Literal["allowed", "blocked", "conditional", "required", "restricted", "insufficient"]
-    page: int | None = None
-    chunk_id: str | None = None
-    evidence: str = ""
-    score: float = 0.0
-    condition: str | None = None
-    evidence_documents: list[str] = Field(default_factory=list)
-    penalties: list[str] = Field(default_factory=list)
-    deadlines: list[str] = Field(default_factory=list)
-
-
 class EvidenceDecision(BaseModel):
     is_sufficient: bool = False
     support_level: Literal["direct", "inferable", "insufficient"] = "insufficient"
@@ -58,7 +44,6 @@ class GraphState(BaseModel):
     intent: Literal["general_answer", "rag"] = "rag"
     search_queries: list[str] = Field(default_factory=list)
     retrieved_documents: list[RetrievedDocument] = Field(default_factory=list)
-    graph_policy_results: list[GraphPolicyResult] = Field(default_factory=list)
     evidence: EvidenceDecision = Field(default_factory=EvidenceDecision)
     policy: PolicyDecision = Field(default_factory=PolicyDecision)
     answer: str = ""
