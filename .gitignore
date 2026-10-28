@@ -48,3 +48,6 @@ frontend/.next/
 /docs/career-inventory-ai.md
 /docs/resume-portfolio-package.md
 /docs/resume-project-entry.md
+
+# 실험 노트북은 실행 출력과 로컬 경로가 섞이므로 저장소에서 제외한다.
+*.ipynb
