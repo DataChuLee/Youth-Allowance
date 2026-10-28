@@ -1,7 +1,6 @@
 from langchain_core.documents import Document
 
 from app.api.schemas import Source
-from app.graph.state import GraphPolicyResult
 
 MAX_EXCERPT_LENGTH = 280
 
@@ -22,14 +21,3 @@ def document_to_source(document: Document, score: float = 0.0) -> Source:
         score=round(score, 4),
     )
 
-
-def graph_policy_to_source(policy: GraphPolicyResult) -> Source:
-    text = compact_text(policy.evidence)
-    return Source(
-        type="graph",
-        title=policy.rule_name,
-        page=int(policy.page or 0),
-        excerpt=text[:MAX_EXCERPT_LENGTH],
-        chunk_id=str(policy.chunk_id or policy.rule_id),
-        score=round(policy.score, 4),
-    )
