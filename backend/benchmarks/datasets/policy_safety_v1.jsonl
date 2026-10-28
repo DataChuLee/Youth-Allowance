@@ -1,0 +1,13 @@
+{"id":"policy-001","scenario":"answerable","question":"청년수당 지급일은 언제인가요?","expected_status":"answered_from_pdf","acceptable_chunk_ids":["sem_0020"]}
+{"id":"policy-002","scenario":"answerable","question":"자기성장기록서는 언제까지 작성해야 하나요?","expected_status":"answered_from_pdf","acceptable_chunk_ids":["sem_0052","sem_0054"]}
+{"id":"policy-003","scenario":"answerable","question":"현금 사용 시 어떤 증빙서류가 필요한가요?","expected_status":"answered_from_pdf","acceptable_chunk_ids":["sem_0034","sem_0035","sem_0063"]}
+{"id":"policy-004","scenario":"answerable","question":"계좌 개설이 안 되면 어떻게 해야 하나요?","expected_status":"answered_from_pdf","acceptable_chunk_ids":["sem_0087"]}
+{"id":"policy-005","scenario":"conditional","question":"해외 생성형 AI 구독료를 결제해도 되나요?","expected_status":"answered_from_pdf","acceptable_chunk_ids":["sem_0049","sem_0055"]}
+{"id":"policy-006","scenario":"policy_blocked","question":"청년수당으로 상품권을 사도 되나요?","expected_status":"blocked_by_policy"}
+{"id":"policy-007","scenario":"policy_blocked","question":"청년수당으로 카카오페이 결제가 가능한가요?","expected_status":"blocked_by_policy"}
+{"id":"policy-008","scenario":"policy_blocked","question":"청년수당으로 중고거래를 해도 되나요?","expected_status":"blocked_by_policy"}
+{"id":"policy-009","scenario":"policy_blocked","question":"ATM에서 현금 인출해서 사용해도 되나요?","expected_status":"blocked_by_policy"}
+{"id":"policy-010","scenario":"policy_blocked","question":"청년수당으로 게임 결제를 해도 되나요?","expected_status":"blocked_by_policy"}
+{"id":"policy-011","scenario":"insufficient","question":"2027년 청년수당 신청 일정은 언제인가요?","expected_status":"insufficient_pdf_evidence"}
+{"id":"policy-012","scenario":"insufficient","question":"청년수당 콜센터의 주말 운영시간은 언제인가요?","expected_status":"insufficient_pdf_evidence"}
+{"id":"policy-013","scenario":"insufficient","question":"서울 외 지역 청년수당도 함께 신청할 수 있나요?","expected_status":"insufficient_pdf_evidence"}
