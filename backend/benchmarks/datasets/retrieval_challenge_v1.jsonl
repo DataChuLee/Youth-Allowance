@@ -1,0 +1,10 @@
+{"id":"retrieval-001","category":"date_keyword","question":"지급일 29일","gold_chunk_ids":["sem_0020"]}
+{"id":"retrieval-002","category":"policy_term","question":"자기성장기록서 기간","gold_chunk_ids":["sem_0052","sem_0054"]}
+{"id":"retrieval-003","category":"short_query","question":"자기성장기록서 언제까지","gold_chunk_ids":["sem_0052","sem_0054"]}
+{"id":"retrieval-004","category":"keyword","question":"현금 사용 증빙서류","gold_chunk_ids":["sem_0034","sem_0035","sem_0063"]}
+{"id":"retrieval-005","category":"keyword","question":"계좌이체 증빙서류","gold_chunk_ids":["sem_0034","sem_0035","sem_0038"]}
+{"id":"retrieval-006","category":"exact_term","question":"학자금대출 대출거래약정서","gold_chunk_ids":["sem_0040","sem_0036","sem_0063"]}
+{"id":"retrieval-007","category":"colloquial","question":"계좌개설 안돼요","gold_chunk_ids":["sem_0087"]}
+{"id":"retrieval-008","category":"keyword","question":"청년수당 반납 재참여","gold_chunk_ids":["sem_0089"]}
+{"id":"retrieval-009","category":"exact_term","question":"자격상실신고 취업 기준","gold_chunk_ids":["sem_0097"]}
+{"id":"retrieval-010","category":"exact_term","question":"생성형 AI 구독료 해외결제","gold_chunk_ids":["sem_0049","sem_0055"]}
