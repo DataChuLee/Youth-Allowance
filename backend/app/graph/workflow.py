@@ -9,7 +9,7 @@ from app.api.schemas import ChatResponse, Source
 from app.core.cache import get_query_cache
 from app.core.config import Settings, get_settings
 from app.core.errors import IndexMissingError
-from app.graph.state import EvidenceDecision, GraphPolicyResult, GraphState, IntentDecision, RetrievedDocument
+from app.graph.state import EvidenceDecision, GraphState, IntentDecision, RetrievedDocument
 from app.rag.evidence import GradeEvidence, grade_evidence as grade_pdf_evidence
 from app.rag.generation import (
     build_blocked_answer,
@@ -17,7 +17,6 @@ from app.rag.generation import (
     build_general_answer,
     generate_pdf_answer,
     generate_policy_context_answer,
-    select_graph_policies_for_question,
     stream_pdf_answer,
     stream_policy_context_answer,
 )
@@ -30,7 +29,7 @@ from app.rag.retrieval import (
     retrieve_pdf_documents_with_ensemble,
     retrieve_with_queries,
 )
-from app.rag.sources import document_to_source, graph_policy_to_source
+from app.rag.sources import document_to_source
 
 DEFAULT_MIN_SIMILARITY_SCORE = 0.2
 
@@ -58,8 +57,7 @@ def _score_lookup(state: GraphState) -> dict[str, float]:
 
 PlanSearchQueries = Callable[[str], list[str]]
 GenerateAnswer = Callable[[str, list[Document]], str]
-RetrieveGraphPolicies = Callable[[str], list[GraphPolicyResult]]
-GeneratePolicyAnswer = Callable[[str, list[Document], list[GraphPolicyResult]], str]
+GeneratePolicyAnswer = Callable[[str, list[Document]], str]
 IntentRouteName = Literal["general_answer", "rag"]
 RouteName = Literal["blocked", "insufficient", "answerable"]
 AnswerStatus = Literal[
@@ -75,7 +73,6 @@ class ChatGraphDependencies:
     classify_intent: ClassifyIntent
     plan_search_queries: PlanSearchQueries
     retrieve_documents: RetrieveDocuments
-    retrieve_graph_policies: RetrieveGraphPolicies
     grade_evidence: GradeEvidence | None
     generate_answer: GenerateAnswer
     generate_policy_answer: GeneratePolicyAnswer
@@ -148,15 +145,6 @@ def select_evidence_documents(state: GraphState) -> list[Document]:
         for item in state.retrieved_documents
         if str(item.document.metadata.get("chunk_id")) in allowed
     ]
-
-
-def select_context_documents(state: GraphState) -> list[Document]:
-    documents = select_evidence_documents(state)
-    if documents:
-        return documents
-    if state.graph_policy_results:
-        return documents_from_state(state)
-    return []
 
 
 def generate_answer_from_documents(
@@ -289,20 +277,6 @@ def retrieve_pdf_node(
     return node
 
 
-def retrieve_graph_node(
-    retrieve_graph_policies: RetrieveGraphPolicies,
-) -> Callable[[GraphState], GraphState]:
-    def node(state: GraphState) -> GraphState:
-        try:
-            state.graph_policy_results = retrieve_graph_policies(state.question)
-        except Exception:
-            # Graph RAG는 보조 정책 근거 레이어입니다. Neo4j 장애가 있어도 PDF RAG 답변 경로는 유지합니다.
-            state.graph_policy_results = []
-        return state
-
-    return node
-
-
 def grade_evidence_node(
     grade_evidence: GradeEvidence | None,
     settings: Settings,
@@ -335,8 +309,6 @@ def resolve_policy_node(*, final: bool) -> Callable[[GraphState], GraphState]:
 def route_policy(state: GraphState) -> RouteName:
     if state.policy.decision == "blocked":
         return "blocked"
-    if state.graph_policy_results:
-        return "answerable"
     if state.policy.decision == "insufficient":
         return "insufficient"
     return "answerable"
@@ -370,32 +342,20 @@ def generate_answer_node(
     use_policy_context_generation: bool,
 ) -> Callable[[GraphState], GraphState]:
     def node(state: GraphState) -> GraphState:
-        documents = select_context_documents(state)
-        if not documents and not state.graph_policy_results:
+        documents = select_evidence_documents(state)
+        if not documents:
             return fallback_no_answer(state)
-
-        graph_policies = select_graph_policies_for_question(
-            state.question,
-            state.graph_policy_results,
-        )
 
         # 이전 대화가 있으면 질문에 컨텍스트를 주입한다 (멀티턴 지원)
         question_with_history = _augment_question_with_history(state.question, state.messages)
 
-        if use_policy_context_generation or graph_policies:
-            state.answer = generate_policy_answer(
-                question_with_history,
-                documents,
-                graph_policies,
-            )
+        if use_policy_context_generation:
+            state.answer = generate_policy_answer(question_with_history, documents)
         else:
             state.answer = generate_answer(question_with_history, documents)
 
         scores = _score_lookup(state)
         state.sources = [
-            graph_policy_to_source(policy)
-            for policy in graph_policies
-        ] + [
             document_to_source(doc, scores.get(str(doc.metadata.get("chunk_id", "")), 0.0))
             for doc in documents
         ]
@@ -421,7 +381,6 @@ def build_chat_graph(
     classify_intent: ClassifyIntent,
     plan_search_queries: PlanSearchQueries,
     retrieve_documents: RetrieveDocuments,
-    retrieve_graph_policies: RetrieveGraphPolicies,
     grade_evidence: GradeEvidence | None,
     generate_answer: GenerateAnswer,
     generate_policy_answer: GeneratePolicyAnswer,
@@ -437,7 +396,6 @@ def build_chat_graph(
         "retrieve_pdf",
         retrieve_pdf_node(retrieve_documents, settings, use_query_expansion),
     )
-    graph.add_node("retrieve_graph", retrieve_graph_node(retrieve_graph_policies))
     graph.add_node("resolve_policy_precheck", resolve_policy_node(final=False))
     graph.add_node("grade_evidence", grade_evidence_node(grade_evidence, settings))
     graph.add_node("resolve_policy", resolve_policy_node(final=True))
@@ -463,8 +421,7 @@ def build_chat_graph(
     )
     graph.add_edge("general_answer", END)
     graph.add_edge("plan_queries", "retrieve_pdf")
-    graph.add_edge("retrieve_pdf", "retrieve_graph")
-    graph.add_edge("retrieve_graph", "resolve_policy_precheck")
+    graph.add_edge("retrieve_pdf", "resolve_policy_precheck")
     graph.add_conditional_edges(
         "resolve_policy_precheck",
         route_policy,
@@ -495,7 +452,6 @@ def resolve_chat_graph_dependencies(
     classify_intent: ClassifyIntent | None = None,
     plan_search_queries: PlanSearchQueries | None = None,
     retrieve_documents: RetrieveDocuments | None = None,
-    retrieve_graph_policies: RetrieveGraphPolicies | None = None,
     grade_evidence: GradeEvidence | None = None,
     generate_answer: GenerateAnswer | None = None,
     generate_policy_answer: GeneratePolicyAnswer | None = None,
@@ -521,10 +477,6 @@ def resolve_chat_graph_dependencies(
     resolved_retrieve_documents = retrieve_documents or (
         lambda query: retrieve_pdf_documents_with_ensemble(query, resolved_settings)
     )
-    if retrieve_graph_policies is not None:
-        resolved_retrieve_graph_policies = retrieve_graph_policies
-    else:
-        resolved_retrieve_graph_policies = lambda query: []
     if grade_evidence is not None:
         resolved_grade_evidence = grade_evidence
     elif retrieve_documents is not None or resolved_settings.app_env == "test":
@@ -539,10 +491,9 @@ def resolve_chat_graph_dependencies(
         lambda query, documents: generate_pdf_answer(query, documents, resolved_settings)
     )
     resolved_generate_policy_answer = generate_policy_answer or (
-        lambda query, documents, graph_policies: generate_policy_context_answer(
+        lambda query, documents: generate_policy_context_answer(
             query,
             documents,
-            graph_policies,
             resolved_settings,
         )
     )
@@ -554,7 +505,6 @@ def resolve_chat_graph_dependencies(
         classify_intent=resolved_classify_intent,
         plan_search_queries=resolved_plan_search_queries,
         retrieve_documents=resolved_retrieve_documents,
-        retrieve_graph_policies=resolved_retrieve_graph_policies,
         grade_evidence=resolved_grade_evidence,
         generate_answer=resolved_generate_answer,
         generate_policy_answer=resolved_generate_policy_answer,
@@ -569,7 +519,6 @@ def run_chat_graph(
     classify_intent: ClassifyIntent | None = None,
     plan_search_queries: PlanSearchQueries | None = None,
     retrieve_documents: RetrieveDocuments | None = None,
-    retrieve_graph_policies: RetrieveGraphPolicies | None = None,
     grade_evidence: GradeEvidence | None = None,
     generate_answer: GenerateAnswer | None = None,
     generate_policy_answer: GeneratePolicyAnswer | None = None,
@@ -582,7 +531,6 @@ def run_chat_graph(
         classify_intent=classify_intent,
         plan_search_queries=plan_search_queries,
         retrieve_documents=retrieve_documents,
-        retrieve_graph_policies=retrieve_graph_policies,
         grade_evidence=grade_evidence,
         generate_answer=generate_answer,
         generate_policy_answer=generate_policy_answer,
@@ -592,7 +540,6 @@ def run_chat_graph(
         classify_intent=dependencies.classify_intent,
         plan_search_queries=dependencies.plan_search_queries,
         retrieve_documents=dependencies.retrieve_documents,
-        retrieve_graph_policies=dependencies.retrieve_graph_policies,
         grade_evidence=dependencies.grade_evidence,
         generate_answer=dependencies.generate_answer,
         generate_policy_answer=dependencies.generate_policy_answer,
@@ -619,7 +566,6 @@ def prepare_chat_stream(
     classify_intent: ClassifyIntent | None = None,
     plan_search_queries: PlanSearchQueries | None = None,
     retrieve_documents: RetrieveDocuments | None = None,
-    retrieve_graph_policies: RetrieveGraphPolicies | None = None,
     grade_evidence: GradeEvidence | None = None,
     generate_answer: GenerateAnswer | None = None,
     generate_policy_answer: GeneratePolicyAnswer | None = None,
@@ -632,7 +578,6 @@ def prepare_chat_stream(
         classify_intent=classify_intent,
         plan_search_queries=plan_search_queries,
         retrieve_documents=retrieve_documents,
-        retrieve_graph_policies=retrieve_graph_policies,
         grade_evidence=grade_evidence,
         generate_answer=generate_answer,
         generate_policy_answer=generate_policy_answer,
@@ -649,19 +594,16 @@ def prepare_chat_stream(
     def capture_policy_answer(
         query: str,
         documents: list[Document],
-        graph_policies: list[GraphPolicyResult],
     ) -> str:
         captured["kind"] = "policy"
         captured["question"] = query
         captured["documents"] = documents
-        captured["graph_policies"] = graph_policies
         return ""
 
     graph = build_chat_graph(
         classify_intent=dependencies.classify_intent,
         plan_search_queries=dependencies.plan_search_queries,
         retrieve_documents=dependencies.retrieve_documents,
-        retrieve_graph_policies=dependencies.retrieve_graph_policies,
         grade_evidence=dependencies.grade_evidence,
         generate_answer=capture_pdf_answer,
         generate_policy_answer=capture_policy_answer,
@@ -678,7 +620,6 @@ def prepare_chat_stream(
         chunks = stream_policy_context_answer(
             str(captured["question"]),
             captured["documents"],  # type: ignore[arg-type]
-            captured["graph_policies"],  # type: ignore[arg-type]
             dependencies.settings,
         )
     elif captured.get("kind") == "pdf":
