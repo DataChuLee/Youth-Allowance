@@ -167,15 +167,6 @@ def score_study_device_document(document: Document) -> int:
     return score
 
 
-def supports_study_device_inference(document: Document) -> bool:
-    text = document.page_content
-    has_device_example = "태블릿" in text or "노트북" in text or "의자" in text
-    has_activity_purpose = "인터넷강의" in text or "공부" in text or "면접 준비" in text
-    has_policy_condition = "청년수당 사업 취지" in text and "구입 가능" in text
-    has_luxury_limit = "고가의 사치품" in text or "구입 제한" in text
-    return has_device_example and has_activity_purpose and has_policy_condition and has_luxury_limit
-
-
 def resolve_policy_decision(
     question: str,
     documents: list[Document],
