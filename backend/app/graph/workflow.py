@@ -1,5 +1,5 @@
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Literal
 
 from langchain_core.documents import Document
@@ -9,7 +9,7 @@ from app.api.schemas import ChatResponse, Source
 from app.core.cache import get_query_cache
 from app.core.config import Settings, get_settings
 from app.core.errors import IndexMissingError
-from app.graph.state import EvidenceDecision, GraphState, IntentDecision, RetrievedDocument
+from app.graph.state import EvidenceDecision, GraphState, IntentDecision
 from app.rag.evidence import GradeEvidence, grade_evidence as grade_pdf_evidence
 from app.rag.generation import (
     build_blocked_answer,
@@ -145,29 +145,6 @@ def select_evidence_documents(state: GraphState) -> list[Document]:
         for item in state.retrieved_documents
         if str(item.document.metadata.get("chunk_id")) in allowed
     ]
-
-
-def generate_answer_from_documents(
-    state: GraphState,
-    generate_answer: GenerateAnswer | None = None,
-) -> GraphState:
-    documents = select_evidence_documents(state)
-    if not documents:
-        return fallback_no_answer(state)
-
-    if generate_answer is None:
-        context = "\n\n".join(document.page_content for document in documents)
-        state.answer = f"안내책자 근거로 확인한 내용입니다.\n\n{context}"
-    else:
-        state.answer = generate_answer(state.question, documents)
-    scores = _score_lookup(state)
-    state.sources = [
-        document_to_source(doc, scores.get(str(doc.metadata.get("chunk_id", "")), 0.0))
-        for doc in documents
-    ]
-    state.status = "answered_from_pdf"
-    state.needs_external_search = False
-    return state
 
 
 def fallback_no_answer(state: GraphState) -> GraphState:
@@ -638,7 +615,3 @@ def prepare_chat_stream(
         needs_external_search=state.needs_external_search,
         intent=state.intent,
     )
-
-
-def retrieved_document_from_score(document: Document, score: float) -> RetrievedDocument:
-    return RetrievedDocument(document=document, score=score)
