@@ -17,11 +17,6 @@ class IndexMissingError(AppError):
     status_code = 409
 
 
-class GenerationError(AppError):
-    error_code = "generation_error"
-    status_code = 500
-
-
 class IndexingError(AppError):
     error_code = "indexing_error"
     status_code = 500
