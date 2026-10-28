@@ -4,11 +4,10 @@ from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
 
 from app.core.config import Settings
-from app.graph.state import GraphPolicyResult, PolicyDecision
+from app.graph.state import PolicyDecision
 from app.rag.prompts import ANSWER_SYSTEM_PROMPT, ANSWER_USER_PROMPT
 
 FOOD_DELIVERY_PLATFORM_TERMS = ("배민", "배달", "배달의민족", "음식배달", "음식 배달")
-PERSONAL_MONEY_MIX_TERMS = ("합산", "개인 돈", "개인돈", "다른 계좌", "제3자 계좌", "섞")
 
 
 def format_context(documents: list[Document]) -> str:
@@ -25,41 +24,6 @@ def is_food_delivery_platform_question(question: str) -> bool:
     return any(term in question for term in FOOD_DELIVERY_PLATFORM_TERMS)
 
 
-def is_personal_money_mix_question(question: str) -> bool:
-    return any(term in question for term in PERSONAL_MONEY_MIX_TERMS)
-
-
-def is_broad_clean_card_blocker(policy: GraphPolicyResult) -> bool:
-    text = f"{policy.rule_id} {policy.rule_name} {policy.evidence}"
-    return (
-        "클린카드" in text
-        or "사용 불가 업종" in text
-        or "사용불가 업종" in text
-    )
-
-
-def is_personal_money_mix_policy(policy: GraphPolicyResult) -> bool:
-    text = f"{policy.rule_id} {policy.rule_name} {policy.evidence}"
-    return "합산" in text or "개인 돈" in text or "개인돈" in text
-
-
-def select_graph_policies_for_question(
-    question: str,
-    policies: list[GraphPolicyResult],
-) -> list[GraphPolicyResult]:
-    selected: list[GraphPolicyResult] = []
-    food_delivery_question = is_food_delivery_platform_question(question)
-    personal_money_question = is_personal_money_mix_question(question)
-
-    for policy in policies:
-        if food_delivery_question and is_broad_clean_card_blocker(policy):
-            continue
-        if not personal_money_question and is_personal_money_mix_policy(policy):
-            continue
-        selected.append(policy)
-    return selected
-
-
 def build_question_specific_guidance(question: str) -> str:
     if is_food_delivery_platform_question(question):
         return (
@@ -73,28 +37,10 @@ def build_question_specific_guidance(question: str) -> str:
     return "질문별 해석 지침: 추가 지침 없음."
 
 
-def format_graph_policy_context(policies: list[GraphPolicyResult]) -> str:
-    if not policies:
-        return "검색된 Graph PolicyRule 근거가 없습니다."
-    return "\n\n".join(
-        (
-            f"[rule_id={policy.rule_id} decision={policy.decision} "
-            f"page={policy.page} chunk_id={policy.chunk_id} score={policy.score:.4f}]\n"
-            f"rule_name: {policy.rule_name}\n"
-            f"condition: {policy.condition or ''}\n"
-            f"evidence: {policy.evidence}\n"
-            f"evidence_documents: {', '.join(policy.evidence_documents)}\n"
-            f"penalties: {', '.join(policy.penalties)}\n"
-            f"deadlines: {', '.join(policy.deadlines)}"
-        )
-        for policy in policies
-    )
-
-
 POLICY_CONTEXT_SYSTEM_PROMPT = """너는 서울시 청년수당 참여자 안내책자 기반 QA assistant다.
 
 규칙:
-- 제공된 Graph PolicyRule 근거와 PDF 원문 근거만 사용해서 답한다.
+- 제공된 PDF 원문 근거만 사용해서 답한다.
 - 근거에 없는 정책 사실을 추측하지 않는다.
 - blocked/restricted rule은 사용자 질문의 품목, 결제수단, 업종, 증빙 조건에 직접 적용될 때만 우선한다.
 - 쿠팡, 배민 같은 플랫폼명만으로 금지 판단하지 않는다.
@@ -108,9 +54,6 @@ POLICY_CONTEXT_SYSTEM_PROMPT = """너는 서울시 청년수당 참여자 안내
 POLICY_CONTEXT_USER_PROMPT = """질문:
 {question}
 
-Graph PolicyRule 근거:
-{graph_context}
-
 PDF 원문 근거:
 {pdf_context}
 
@@ -122,7 +65,6 @@ PDF 원문 근거:
 def generate_policy_context_answer(
     question: str,
     documents: list[Document],
-    graph_policies: list[GraphPolicyResult],
     settings: Settings,
 ) -> str:
     llm = ChatOpenAI(
@@ -130,7 +72,7 @@ def generate_policy_context_answer(
         model=settings.openai_chat_model,
         temperature=0,
     )
-    messages = build_policy_context_messages(question, documents, graph_policies)
+    messages = build_policy_context_messages(question, documents)
     response = llm.invoke(messages)
     return str(response.content).strip()
 
@@ -138,7 +80,6 @@ def generate_policy_context_answer(
 def build_policy_context_messages(
     question: str,
     documents: list[Document],
-    graph_policies: list[GraphPolicyResult],
 ) -> list[tuple[str, str]]:
     return [
         ("system", POLICY_CONTEXT_SYSTEM_PROMPT),
@@ -146,7 +87,6 @@ def build_policy_context_messages(
             "human",
             POLICY_CONTEXT_USER_PROMPT.format(
                 question=question,
-                graph_context=format_graph_policy_context(graph_policies),
                 pdf_context=format_context(documents) if documents else "검색된 PDF 근거가 없습니다.",
                 question_guidance=build_question_specific_guidance(question),
             ),
@@ -157,7 +97,6 @@ def build_policy_context_messages(
 def stream_policy_context_answer(
     question: str,
     documents: list[Document],
-    graph_policies: list[GraphPolicyResult],
     settings: Settings,
 ) -> Iterator[str]:
     llm = ChatOpenAI(
@@ -167,7 +106,7 @@ def stream_policy_context_answer(
     )
     yield from stream_chat_content(
         llm,
-        build_policy_context_messages(question, documents, graph_policies),
+        build_policy_context_messages(question, documents),
     )
 
 
