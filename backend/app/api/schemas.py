@@ -30,7 +30,7 @@ class ChatRequest(BaseModel):
 
 class Source(BaseModel):
     type: str = Field(
-        description="출처 유형 (pdf: 안내책자 원문 | graph: 정책 규칙 그래프)",
+        description="출처 유형 (pdf: 안내책자 원문)",
         examples=["pdf"],
     )
     title: str = Field(
