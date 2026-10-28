@@ -23,7 +23,7 @@ frontend/.next/
 /backend/benchmarks/results/
 /backend/evaluation_results/
 
-# Graph RAG 중간 산출물. 수동 검수 원본 graph_items.yaml은 제외하지 않는다.
+# 제거된 Graph RAG 실험의 로컬 산출물
 /backend/graph_rag_artifacts/*.json
 
 # 실험 노트북은 실행 출력과 로컬 경로가 섞이므로 저장소에서 제외한다.
