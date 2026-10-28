@@ -25,23 +25,9 @@ frontend/.next/
 
 # Graph RAG 중간 산출물. 수동 검수 원본 graph_items.yaml은 제외하지 않는다.
 /backend/graph_rag_artifacts/*.json
-/study/ocr_output/
-/study/*.json
 
-# 실행 출력과 로컬 경로가 포함된 실험 노트북
-/backend/GraphRAG.ipynb
-/backend/RAG_Evaluation.ipynb
-/backend/RAG_Langgraph.ipynb
-/backend/RAG_Langgraph_last.ipynb
-/backend/RAG_Master_1.ipynb
-/backend/RAG_Master_2.ipynb
-/backend/RAG_Master_Final.ipynb
-/backend/RAG_TestsetGenerator.ipynb
-/study/neo4j_graph_rag.ipynb
-/study/pdf_graph_rag.ipynb
-/study/pdf_hybrid_rag.ipynb
-/study/pdf_ocr.ipynb
-/study/pdf_vector_rag.ipynb
+# 실험 노트북은 실행 출력과 로컬 경로가 섞이므로 저장소에서 제외한다.
+*.ipynb
 .ipynb_checkpoints/
 
 # 공개 제품 저장소와 분리할 개인 경력 문서
@@ -49,5 +35,5 @@ frontend/.next/
 /docs/resume-portfolio-package.md
 /docs/resume-project-entry.md
 
-# 실험 노트북은 실행 출력과 로컬 경로가 섞이므로 저장소에서 제외한다.
-*.ipynb
+# 서비스에 반영되지 않은 로컬 실험 코드
+/study/
