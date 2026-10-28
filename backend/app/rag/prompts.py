@@ -95,8 +95,6 @@ EVIDENCE_GRADER_USER_PROMPT = """사용자 질문:
 검색된 PDF 근거:
 {context}"""
 
-EVIDENCE_GRADER_PROMPT = EVIDENCE_GRADER_SYSTEM_PROMPT
-
 INTENT_CLASSIFIER_SYSTEM_PROMPT = """너는 서울 청년수당 안내 챗봇의 intent classifier다.
 
 역할:
