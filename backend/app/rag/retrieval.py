@@ -1,10 +1,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
-from threading import Lock
 
-from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.retrievers import BM25Retriever
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
@@ -27,10 +24,8 @@ from app.rag.query_preprocessing import (
 
 DEFAULT_RETRIEVAL_CANDIDATE_K = 20
 DEFAULT_RETRIEVAL_RRF_K = 60
-BM25_PDF_CACHE_MAXSIZE = 4
 TRUSTED_FAISS_INDEX_ROOT = BACKEND_DIR.resolve()
 FAISS_INDEX_FILENAMES = ("index.faiss", "index.pkl")
-_BM25_PDF_CACHE_LOCK = Lock()
 
 RetrieveDocuments = Callable[[str], list[RetrievedDocument]]
 
@@ -284,51 +279,6 @@ def load_documents_from_faiss_store(vector_store) -> list[Document]:
     return documents
 
 
-@lru_cache(maxsize=BM25_PDF_CACHE_MAXSIZE)
-def _load_bm25_documents_from_pdf_cached(
-    resolved_pdf_path: str,
-    modified_time_ns: int,
-    file_size: int,
-) -> tuple[Document, ...]:
-    # 수정 시간과 크기는 캐시 key로만 사용하며 파서는 고정된 로컬 파일을 읽는다.
-    _ = modified_time_ns, file_size
-    try:
-        pages = [
-            page
-            for page in PyPDFLoader(resolved_pdf_path).load()
-            if page.page_content.strip()
-        ]
-        if not pages:
-            return ()
-        # 기존 인덱싱과 동일한 chunk_id 규칙을 사용해 출처 계약을 유지한다.
-        from app.indexing.index_pdf import split_pages
-
-        return tuple(split_pages(pages))
-    except Exception:
-        return ()
-
-
-def load_bm25_documents_from_pdf(pdf_path: Path) -> list[Document]:
-    """같은 상태의 PDF를 재파싱하지 않고 텍스트 레이어에서 BM25 문서를 복구한다."""
-    try:
-        resolved_pdf_path = Path(pdf_path).resolve()
-        file_stat = resolved_pdf_path.stat()
-        if not resolved_pdf_path.is_file():
-            return []
-    except OSError:
-        return []
-
-    # lru_cache 자체는 thread-safe지만 동시 miss에서 loader가 중복 실행될 수 있어
-    # fallback 파싱 구간을 single-flight로 직렬화한다.
-    with _BM25_PDF_CACHE_LOCK:
-        cached = _load_bm25_documents_from_pdf_cached(
-            str(resolved_pdf_path),
-            file_stat.st_mtime_ns,
-            file_stat.st_size,
-        )
-    return list(cached)
-
-
 def create_ensemble_retriever(settings: Settings | None = None) -> HybridRRFRetriever:
     resolved_settings = settings or get_settings()
     faiss_index_dir = Path(resolved_settings.faiss_index_dir)
@@ -363,11 +313,8 @@ def create_ensemble_retriever(settings: Settings | None = None) -> HybridRRFRetr
             except IndexMissingError:
                 bm25_documents = []
         except Exception:
-            # 손상되거나 호환되지 않는 FAISS 파일은 BM25-only 경로로 격리한다.
+            # 손상되거나 호환되지 않는 FAISS 파일은 사용하지 않는다.
             vector_retriever = None
-
-    if not bm25_documents:
-        bm25_documents = load_bm25_documents_from_pdf(Path(resolved_settings.pdf_path))
 
     bm25_retriever = None
     if bm25_documents:
@@ -377,11 +324,9 @@ def create_ensemble_retriever(settings: Settings | None = None) -> HybridRRFRetr
     if vector_retriever is None and bm25_retriever is None:
         if not faiss_exists:
             raise IndexMissingError(
-                "FAISS 인덱스와 BM25 fallback용 PDF 텍스트가 없습니다."
+                "FAISS 인덱스가 없습니다. 먼저 python -m app.indexing.index_pdf를 실행하세요."
             )
-        raise RetrievalUnavailableError(
-            "FAISS 인덱스를 읽을 수 없고 BM25 fallback 문서도 없습니다."
-        )
+        raise RetrievalUnavailableError("FAISS 인덱스를 읽을 수 없습니다.")
 
     return HybridRRFRetriever(
         bm25_retriever=bm25_retriever,
