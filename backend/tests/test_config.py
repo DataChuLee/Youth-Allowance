@@ -28,3 +28,9 @@ def test_openai_model_names_have_safe_defaults(monkeypatch) -> None:
     assert settings.openai_embedding_model == DEFAULT_OPENAI_EMBEDDING_MODEL
     assert settings.retrieval_candidate_k == 20
     assert settings.retrieval_rrf_k == 60
+
+
+def test_blocker_check_can_be_disabled_from_env(monkeypatch) -> None:
+    monkeypatch.setenv("BLOCKER_CHECK_ENABLED", "false")
+
+    assert Settings(OPENAI_API_KEY="test").blocker_check_enabled is False

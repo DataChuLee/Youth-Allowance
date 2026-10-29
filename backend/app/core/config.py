@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     openai_blocker_check_model: str = Field(
         default=DEFAULT_OPENAI_BLOCKER_CHECK_MODEL, alias="OPENAI_BLOCKER_CHECK_MODEL"
     )
+    # false면 확인 없이 키워드만으로 차단한다(기준선 재현·비교 실험용).
+    blocker_check_enabled: bool = Field(default=True, alias="BLOCKER_CHECK_ENABLED")
     ocr_jsonl_path: Path = Field(default=DEFAULT_OCR_JSONL_PATH, alias="OCR_JSONL_PATH")
     faiss_index_dir: Path = Field(default=DEFAULT_FAISS_INDEX_DIR, alias="FAISS_INDEX_DIR")
     langsmith_tracing: bool = Field(default=False, alias="LANGSMITH_TRACING")
