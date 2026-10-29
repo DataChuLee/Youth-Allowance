@@ -1,0 +1,55 @@
+{"id": "tbldev-001", "category": "prohibited_table", "question": "친구들이랑 노래방에서 쓴 돈 청년수당으로 계산해도 되나요?", "gold_chunk_ids": ["sem_0032", "sem_0090"]}
+{"id": "tbldev-002", "category": "prohibited_table", "question": "스트레스 풀려고 주말에 실외 골프장 라운딩비로 써도 돼요?", "gold_chunk_ids": ["sem_0032", "sem_0090"]}
+{"id": "tbldev-003", "category": "prohibited_table", "question": "공항 면세점에서 화장품 사는 데 청년수당 카드 되나요?", "gold_chunk_ids": ["sem_0032", "sem_0090"]}
+{"id": "tbldev-004", "category": "prohibited_table", "question": "가족 여행 가서 콘도 숙박비를 청년수당으로 결제해도 돼요?", "gold_chunk_ids": ["sem_0032", "sem_0090"]}
+{"id": "tbldev-005", "category": "prohibited_table", "question": "면접 때 하려고 금목걸이 하나 사려는데 청년수당 써도 되나요?", "gold_chunk_ids": ["sem_0032", "sem_0090"]}
+{"id": "tbldev-006", "category": "prohibited_table", "question": "취준하느라 어깨 아파서 안마 받는 비용 청년수당으로 돼요?", "gold_chunk_ids": ["sem_0032", "sem_0090"]}
+{"id": "tbldev-007", "category": "prohibited_table", "question": "주말에 나이트클럽 입장료 청년수당 카드로 내도 돼요?", "gold_chunk_ids": ["sem_0032", "sem_0090"]}
+{"id": "tbldev-008", "category": "prohibited_table", "question": "배달 알바용 오토바이 사는 데 청년수당 써도 될까요?", "gold_chunk_ids": ["sem_0032", "sem_0090"]}
+{"id": "tbldev-009", "category": "prohibited_table", "question": "제 생명보험료를 청년수당 카드로 내도 되나요?", "gold_chunk_ids": ["sem_0032", "sem_0090"]}
+{"id": "tbldev-010", "category": "prohibited_table", "question": "다니는 교회에 헌금하는 걸 청년수당으로 해도 돼요?", "gold_chunk_ids": ["sem_0032", "sem_0090"]}
+{"id": "tbldev-011", "category": "prohibited_table", "question": "취업운 보러 철학관 가는 비용 청년수당으로 써도 되나요?", "gold_chunk_ids": ["sem_0032", "sem_0090"]}
+{"id": "tbldev-012", "category": "prohibited_table", "question": "조카 유치원비를 대신 청년수당으로 내줘도 돼요?", "gold_chunk_ids": ["sem_0032", "sem_0090"]}
+{"id": "tbldev-013", "category": "prohibited_table", "question": "로또 사는 데 청년수당 카드 써도 되나요?", "gold_chunk_ids": ["sem_0032", "sem_0090"]}
+{"id": "tbldev-014", "category": "prohibited_table", "question": "오락실에서 게임하는 데 청년수당 써도 돼요?", "gold_chunk_ids": ["sem_0032", "sem_0090"]}
+{"id": "tbldev-015", "category": "prohibited_table", "question": "새 차 계약금을 청년수당 카드로 결제해도 되나요?", "gold_chunk_ids": ["sem_0032", "sem_0090"]}
+{"id": "tbldev-016", "category": "prohibited_table", "question": "방문판매로 산 온수매트 값을 청년수당으로 내도 돼요?", "gold_chunk_ids": ["sem_0032", "sem_0090"]}
+{"id": "tbldev-017", "category": "prohibited_table", "question": "마트 주류 코너 말고 주류 도매점에서 술 사는 건 청년수당 되나요?", "gold_chunk_ids": ["sem_0032", "sem_0090"]}
+{"id": "tbldev-018", "category": "prohibited_table", "question": "스포츠마사지 받는 거 청년수당으로 결제돼요?", "gold_chunk_ids": ["sem_0032", "sem_0090"]}
+{"id": "cq-answerable-001", "category": "content_quality", "question": "청년수당을 신청할 수 있는 나이 조건은 무엇인가요?", "gold_chunk_ids": ["sem_0014"]}
+{"id": "cq-answerable-002", "category": "content_quality", "question": "청년수당 신청을 위한 거주지 조건은 무엇인가요?", "gold_chunk_ids": ["sem_0014"]}
+{"id": "cq-answerable-003", "category": "content_quality", "question": "청년수당 신청을 위한 소득 기준은 어떻게 되나요?", "gold_chunk_ids": ["sem_0014"]}
+{"id": "cq-answerable-004", "category": "content_quality", "question": "재학생이나 휴학생도 청년수당을 신청할 수 있나요?", "gold_chunk_ids": ["sem_0015"]}
+{"id": "cq-answerable-005", "category": "content_quality", "question": "청년수당 신청 시 고용 상태 조건은 무엇인가요?", "gold_chunk_ids": ["sem_0014"]}
+{"id": "cq-answerable-006", "category": "content_quality", "question": "기초생활수급자나 차상위계층도 청년수당을 받을 수 있나요?", "gold_chunk_ids": ["sem_0015"]}
+{"id": "cq-answerable-007", "category": "content_quality", "question": "실업급여를 수급 중인 경우 청년수당을 신청할 수 있나요?", "gold_chunk_ids": ["sem_0016"]}
+{"id": "cq-answerable-008", "category": "content_quality", "question": "이전에 청년수당을 받은 적이 있으면 다시 신청할 수 있나요?", "gold_chunk_ids": ["sem_0085"]}
+{"id": "cq-answerable-009", "category": "content_quality", "question": "청년수당 월 지원 금액은 얼마인가요?", "gold_chunk_ids": ["sem_0014"]}
+{"id": "cq-answerable-010", "category": "content_quality", "question": "청년수당은 최대 몇 개월 지원되나요?", "gold_chunk_ids": ["sem_0014"]}
+{"id": "cq-answerable-011", "category": "content_quality", "question": "2026년 청년수당 사업 참여 기간은 언제부터 언제까지인가요?", "gold_chunk_ids": ["sem_0020"]}
+{"id": "cq-answerable-012", "category": "content_quality", "question": "취업으로 자격상실신고를 하면 취업성공금을 얼마나 받을 수 있나요?", "gold_chunk_ids": ["sem_0026", "sem_0097"]}
+{"id": "cq-answerable-013", "category": "content_quality", "question": "청년수당을 당월에 다 쓰지 못하면 어떻게 되나요?", "gold_chunk_ids": ["sem_0089"]}
+{"id": "cq-answerable-016", "category": "content_quality", "question": "노래방에서 청년수당 카드를 사용할 수 있나요?", "gold_chunk_ids": ["sem_0032", "sem_0090"]}
+{"id": "cq-answerable-017", "category": "content_quality", "question": "태블릿 PC나 노트북을 청년수당으로 구매할 수 있나요?", "gold_chunk_ids": ["sem_0087"]}
+{"id": "cq-answerable-018", "category": "content_quality", "question": "해외 생성형 AI 프로그램(챗GPT 등) 구독료를 청년수당으로 지불할 수 있나요?", "gold_chunk_ids": ["sem_0049"]}
+{"id": "cq-answerable-020", "category": "content_quality", "question": "청년수당으로 월세를 현금(계좌이체)으로 낼 수 있나요?", "gold_chunk_ids": ["sem_0033", "sem_0035"]}
+{"id": "cq-answerable-021", "category": "content_quality", "question": "청년수당을 본인의 다른 개인 계좌로 이체해서 사용할 수 있나요?", "gold_chunk_ids": ["sem_0048"]}
+{"id": "cq-answerable-022", "category": "content_quality", "question": "학원비를 청년수당으로 결제할 수 있나요?", "gold_chunk_ids": ["sem_0031"]}
+{"id": "cq-answerable-023", "category": "content_quality", "question": "국민건강보험료를 청년수당으로 납부할 수 있나요?", "gold_chunk_ids": ["sem_0032"]}
+{"id": "cq-answerable-024", "category": "content_quality", "question": "청년수당 전용 계좌는 어느 은행에서 개설해야 하나요?", "gold_chunk_ids": ["sem_0029"]}
+{"id": "cq-answerable-025", "category": "content_quality", "question": "자기성장기록서 제출 기간은 언제인가요?", "gold_chunk_ids": ["sem_0052", "sem_0065"]}
+{"id": "cq-answerable-026", "category": "content_quality", "question": "자기성장기록서를 제출하지 않으면 어떻게 되나요?", "gold_chunk_ids": ["sem_0052", "sem_0093"]}
+{"id": "cq-answerable-027", "category": "content_quality", "question": "자격상실 신고는 어떻게 하나요?", "gold_chunk_ids": ["sem_0022", "sem_0096"]}
+{"id": "cq-answerable-028", "category": "content_quality", "question": "월세를 현금(계좌이체)으로 낼 때 제출해야 하는 필수 증빙서류는?", "gold_chunk_ids": ["sem_0035", "sem_0063"]}
+{"id": "cq-answerable-029", "category": "content_quality", "question": "군 복무 중에도 청년수당을 신청할 수 있나요?", "gold_chunk_ids": ["sem_0014", "sem_0016"]}
+{"id": "cq-answerable-030", "category": "content_quality", "question": "청년수당 관련 문의를 할 수 있는 전담 콜센터 번호는?", "gold_chunk_ids": ["sem_0016", "sem_0098"]}
+{"id": "retrieval-001", "category": "challenge_date_keyword", "question": "지급일 29일", "gold_chunk_ids": ["sem_0020"]}
+{"id": "retrieval-002", "category": "challenge_policy_term", "question": "자기성장기록서 기간", "gold_chunk_ids": ["sem_0052", "sem_0054"]}
+{"id": "retrieval-003", "category": "challenge_short_query", "question": "자기성장기록서 언제까지", "gold_chunk_ids": ["sem_0052", "sem_0054"]}
+{"id": "retrieval-004", "category": "challenge_keyword", "question": "현금 사용 증빙서류", "gold_chunk_ids": ["sem_0034", "sem_0035", "sem_0063"]}
+{"id": "retrieval-005", "category": "challenge_keyword", "question": "계좌이체 증빙서류", "gold_chunk_ids": ["sem_0034", "sem_0035", "sem_0038"]}
+{"id": "retrieval-006", "category": "challenge_exact_term", "question": "학자금대출 대출거래약정서", "gold_chunk_ids": ["sem_0040", "sem_0036", "sem_0063"]}
+{"id": "retrieval-007", "category": "challenge_colloquial", "question": "계좌개설 안돼요", "gold_chunk_ids": ["sem_0087"]}
+{"id": "retrieval-008", "category": "challenge_keyword", "question": "청년수당 반납 재참여", "gold_chunk_ids": ["sem_0089"]}
+{"id": "retrieval-009", "category": "challenge_exact_term", "question": "자격상실신고 취업 기준", "gold_chunk_ids": ["sem_0097"]}
+{"id": "retrieval-010", "category": "challenge_exact_term", "question": "생성형 AI 구독료 해외결제", "gold_chunk_ids": ["sem_0049", "sem_0055"]}
