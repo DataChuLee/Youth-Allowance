@@ -91,7 +91,7 @@ class ErrorResponse(BaseModel):
 
 class HealthDependencies(BaseModel):
     faiss_index: Literal["ok", "missing"] = Field(
-        description="FAISS 벡터 인덱스 상태 (missing이면 로컬 PDF 기반 BM25 fallback 시도)"
+        description="FAISS 벡터 인덱스 상태 (missing이면 채팅이 index_missing을 반환)"
     )
     redis_cache: Literal["ok", "unavailable"] = Field(
         description="Redis 쿼리 캐시 상태 (unavailable이어도 서비스 동작, 응답 속도 저하)"
