@@ -1,3 +1,4 @@
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,6 +29,20 @@ TRUSTED_FAISS_INDEX_ROOT = BACKEND_DIR.resolve()
 FAISS_INDEX_FILENAMES = ("index.faiss", "index.pkl")
 
 RetrieveDocuments = Callable[[str], list[RetrievedDocument]]
+
+
+def tokenize_for_bm25(text: str) -> list[str]:
+    """한글은 2글자 단위로 쪼개 BM25가 조사·어미 차이("노래방에서" vs "노래방")에도 맞도록 한다.
+
+    공백 분리만 쓰면 조사가 붙은 질문 토큰이 안내책자 표의 업종명과 일치하지 않는다.
+    """
+    tokens: list[str] = []
+    for word in re.findall(r"[가-힣]+|[0-9a-z]+", text.lower()):
+        if word[0].isascii() or len(word) == 1:
+            tokens.append(word)
+        else:
+            tokens.extend(word[i : i + 2] for i in range(len(word) - 1))
+    return tokens
 
 
 class RetrievalUnavailableError(RuntimeError):
@@ -318,7 +333,10 @@ def create_ensemble_retriever(settings: Settings | None = None) -> HybridRRFRetr
 
     bm25_retriever = None
     if bm25_documents:
-        bm25_retriever = BM25Retriever.from_documents(bm25_documents)
+        bm25_retriever = BM25Retriever.from_documents(
+            bm25_documents,
+            preprocess_func=tokenize_for_bm25,
+        )
         bm25_retriever.k = resolved_settings.retrieval_candidate_k
 
     if vector_retriever is None and bm25_retriever is None:
