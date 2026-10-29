@@ -80,6 +80,7 @@ def run_meta(stage: str, **extra: Any) -> dict[str, Any]:
         "chat_model": settings.openai_chat_model,
         "embedding_model": settings.openai_embedding_model,
         "blocker_check_model": settings.openai_blocker_check_model,
+        "blocker_check_enabled": settings.blocker_check_enabled,
         **extra,
     }
 
