@@ -6,15 +6,15 @@
 
 - `README.md`는 프로젝트 진입 문서입니다.
 - `docs/PRD.md`는 제품 범위, API 동작, 성공 기준, 수동 검증 질문을 정의합니다.
-- `docs/architecture.md`는 예정된 FastAPI 백엔드, Next.js 프론트엔드, LangChain/LangGraph 워크플로, Chroma 저장소, 계약을 설명합니다.
-- `Data/`에는 `Data/청년수당 참여자 안내책자.pdf` 같은 로컬 원본 PDF가 들어갑니다. Git에서 무시되며 커밋하면 안 됩니다.
+- `docs/architecture.md`는 예정된 FastAPI 백엔드, Next.js 프론트엔드, LangChain/LangGraph 워크플로, FAISS + BM25 검색, 계약을 설명합니다.
+- `Data/`에는 원본 PDF와 인덱싱 입력인 Upstage OCR 결과(`upstage_youth_allowance_parse.jsonl`)가 들어갑니다. Git에서 무시되며 커밋하면 안 됩니다.
 - `.env`와 `venv/`는 로컬 전용이며 Git에서 무시됩니다.
 
 구현을 시작하면 문서화된 구조를 따르세요.
 
 ```text
 backend/app/{api,graph,indexing,rag,core}/
-backend/storage/chroma/
+backend/faiss_rag_final/
 frontend/
 docs/
 ```
@@ -67,7 +67,7 @@ Python은 4칸 들여쓰기, 공개 함수 타입 힌트, 요청/응답 계약�
 - PR 생성 전후로 `/review` 또는 코드 리뷰 요청을 실행해 버그, 리스크, 누락 테스트를 점검합니다.
 - 리뷰 결과나 PR 코멘트를 반영하고 추가 커밋 후 다시 push합니다.
 
-풀 리퀘스트에는 요약, 변경 영역, 수행한 검증, UI 변경 시 스크린샷을 포함하세요. 관련 이슈가 있으면 연결하세요. merge는 가능하더라도 테스트와 리뷰 상태를 확인한 뒤 사용자 확인 후 진행하세요. `.env`, `venv/`, Chroma 저장소, `Data/` 파일은 절대 포함하지 마세요.
+풀 리퀘스트에는 요약, 변경 영역, 수행한 검증, UI 변경 시 스크린샷을 포함하세요. 관련 이슈가 있으면 연결하세요. merge는 가능하더라도 테스트와 리뷰 상태를 확인한 뒤 사용자 확인 후 진행하세요. `.env`, `venv/`, FAISS 인덱스, `Data/` 파일은 절대 포함하지 마세요.
 
 ## 보안 및 설정
 
