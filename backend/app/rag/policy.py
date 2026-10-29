@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from langchain_core.documents import Document
 
 from app.graph.state import EvidenceDecision, PolicyBlocker, PolicyDecision
@@ -171,27 +173,33 @@ def resolve_policy_decision(
     question: str,
     documents: list[Document],
     evidence: EvidenceDecision | None,
+    confirm_blockers: Callable[[str, list[PolicyBlocker]], list[PolicyBlocker]] | None = None,
 ) -> PolicyDecision:
-    matched_blockers = attach_evidence_to_blockers(
-        detect_question_blockers(question),
-        documents,
-    )
-
-    if matched_blockers:
-        source_chunk_ids: list[str] = []
-        for blocker in matched_blockers:
-            source_chunk_ids.extend(blocker.source_chunk_ids)
-
-        # 질문에 명시된 금지 조건이 PDF 근거에서도 확인되면 허용 템플릿보다 항상 우선한다.
-        return PolicyDecision(
-            decision="blocked",
-            reason="질문에 포함된 결제 방식 또는 사용 목적이 안내책자의 사용 불가 조건과 충돌합니다.",
-            matched_blockers=matched_blockers,
-            source_chunk_ids=list(dict.fromkeys(source_chunk_ids)),
-        )
-
-    # 사전 점검에서는 정책 제한 근거만 우선 차단하고, 나머지 질문은 LLM 근거 평가로 넘긴다.
+    # 키워드 차단은 사전 점검(evidence 없음)에서만 판단한다. 최종 판단은 같은 문서를 다시 보므로
+    # 여기서 다시 검사하면 확인기가 풀어 준 차단이 되살아난다.
     if evidence is None:
+        matched_blockers = attach_evidence_to_blockers(
+            detect_question_blockers(question),
+            documents,
+        )
+        # 키워드가 비교·다른 뜻으로만 쓰인 질문까지 막지 않도록, 실제 지출이 제한 항목인지 확인한다.
+        if matched_blockers and confirm_blockers is not None:
+            matched_blockers = confirm_blockers(question, matched_blockers)
+
+        if matched_blockers:
+            source_chunk_ids: list[str] = []
+            for blocker in matched_blockers:
+                source_chunk_ids.extend(blocker.source_chunk_ids)
+
+            # 질문에 명시된 금지 조건이 PDF 근거에서도 확인되면 허용 템플릿보다 항상 우선한다.
+            return PolicyDecision(
+                decision="blocked",
+                reason="질문에 포함된 결제 방식 또는 사용 목적이 안내책자의 사용 불가 조건과 충돌합니다.",
+                matched_blockers=matched_blockers,
+                source_chunk_ids=list(dict.fromkeys(source_chunk_ids)),
+            )
+
+        # 사전 점검에서는 정책 제한 근거만 우선 차단하고, 나머지 질문은 LLM 근거 평가로 넘긴다.
         return PolicyDecision(decision="conditional", reason="정책 제한 근거가 확인되지 않았습니다.")
 
     if evidence.is_sufficient:
