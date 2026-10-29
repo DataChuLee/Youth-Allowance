@@ -476,8 +476,12 @@ def resolve_chat_graph_dependencies(
         )
     if confirm_blockers is not None:
         resolved_confirm_blockers = confirm_blockers
-    elif retrieve_documents is not None or resolved_settings.app_env == "test":
-        # 주입 테스트는 기존 키워드 차단 동작을 그대로 검증한다.
+    elif (
+        retrieve_documents is not None
+        or resolved_settings.app_env == "test"
+        or not resolved_settings.blocker_check_enabled
+    ):
+        # 주입 테스트와 비활성 설정은 기존 키워드 차단 동작을 그대로 쓴다.
         resolved_confirm_blockers = None
     else:
         resolved_confirm_blockers = create_blocker_confirmer(resolved_settings)
