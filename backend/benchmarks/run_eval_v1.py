@@ -214,8 +214,8 @@ def stage_score(tag: str) -> None:
         "latency_ms": latency_summary([row["elapsed_ms"] for row in answers.values()]),
     }
     human_path = result_path("judge_sample.csv", tag)
-    if human_path.exists():
-        human = read_human_labels(human_path)
+    human = read_human_labels(human_path) if human_path.exists() else {}
+    if human:
         ids = sorted(case_id for case_id in human if case_id in labels)
         summary["judge_agreement"] = {
             "n": len(ids),
