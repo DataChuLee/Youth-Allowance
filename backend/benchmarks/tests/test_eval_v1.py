@@ -93,3 +93,15 @@ def test_aggregate_runs_flags_items_unsafe_in_any_run_and_label_flips() -> None:
     assert result["metrics"]["unsafe_allow"]["k_per_run"] == [0, 1]
     assert result["unsafe_allow_any_run"]["ids"] == ["n1"]
     assert result["label_flip"]["ids"] == ["n1"]
+
+
+def test_score_source_evidence_checks_quotes_in_generation_sources() -> None:
+    from benchmarks.eval_v1 import score_source_evidence
+
+    cases = [make_case("a", quotes=("학교등록금",)), make_case("b", quotes=("단순 미용 목적",))]
+    answers = {"a": {"source_chunk_ids": ["table"]}, "b": {"source_chunk_ids": ["general"]}}
+    texts = {"table": "| 39 | 학교등록금 |", "general": "의료비로 사용 가능"}
+
+    result = score_source_evidence(cases, answers, texts)
+
+    assert result["overall"]["k"] == 1 and result["overall"]["n"] == 2

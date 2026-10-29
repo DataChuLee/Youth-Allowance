@@ -23,6 +23,7 @@ from benchmarks.eval_v1 import (
     parse_judge_label,
     score_answers,
     score_retrieval,
+    score_source_evidence,
 )
 
 BENCHMARK_DIR = Path(__file__).resolve().parent
@@ -205,6 +206,16 @@ def read_human_labels(path: Path) -> dict[str, str]:
     return {row[0]: row[3].strip().upper() for row in rows[1:] if len(row) > 3 and row[3].strip()}
 
 
+def load_source_texts() -> dict[str, str]:
+    from app.core.config import get_settings
+
+    from benchmarks.run_content_quality import load_chunk_texts
+
+    # 출처 ID를 원문으로 바꾸려면 측정에 쓴 인덱스가 현재 인덱스와 같아야 한다.
+    load_index_manifest()
+    return load_chunk_texts(get_settings())
+
+
 def stage_score(tag: str) -> None:
     cases = load_eval_cases(CASES_PATH)
     retrieval_meta, retrieval = read_jsonl(result_path("retrieval.jsonl", tag))
@@ -218,6 +229,7 @@ def stage_score(tag: str) -> None:
             cases, {case_id: row["chunk_texts"] for case_id, row in retrieval.items()}
         ),
         "answers": score_answers(cases, answers, labels),
+        "source_evidence": score_source_evidence(cases, answers, load_source_texts()),
         "judge_parse_errors": [case_id for case_id, label in labels.items() if label == "PARSE_ERROR"],
         "latency_ms": latency_summary([row["elapsed_ms"] for row in answers.values()]),
     }

@@ -123,6 +123,27 @@ def score_retrieval(
     }
 
 
+def score_source_evidence(
+    cases: list[EvalCase], answers: Mapping[str, Mapping[str, Any]], chunk_texts: Mapping[str, str]
+) -> dict[str, Any]:
+    """보조 지표: 답변 생성에 실제로 전달된 출처(sources)에 근거 인용문이 있었는지."""
+    rows = [
+        (case, any(rank is not None for rank in quote_ranks(
+            case.quotes, [chunk_texts.get(chunk_id, "") for chunk_id in answers[case.case_id]["source_chunk_ids"]]
+        )))
+        for case in cases
+        if case.quotes and case.case_id in answers
+    ]
+    return {
+        "overall": rate(sum(hit for _, hit in rows), len(rows)),
+        "by_category": {
+            category: rate(sum(hit for c, hit in rows if c.category == category),
+                           sum(c.category == category for c, _ in rows))
+            for category in sorted({c.category for c, _ in rows})
+        },
+    }
+
+
 def is_over_blocked(label: str, status: str) -> bool:
     return status == "blocked_by_policy" or label in {"DENY", "NO_INFO"}
 
