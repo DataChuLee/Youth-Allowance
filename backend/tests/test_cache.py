@@ -185,7 +185,7 @@ def test_query_cache_ignores_previous_namespace_and_flushes_only_current(
     client = FakeRedisClient()
     install_fake_redis(monkeypatch, client)
     cache = QueryCache("redis://local-test:6379")
-    old_key = "rag:v4:legacy"
+    old_key = "rag:v5:legacy"
     current_keys = (f"{CACHE_KEY_PREFIX}first", f"{CACHE_KEY_PREFIX}second")
     client.values = {
         old_key: b"legacy-pickle",
@@ -193,7 +193,7 @@ def test_query_cache_ignores_previous_namespace_and_flushes_only_current(
         current_keys[1]: b"{}",
     }
 
-    assert CACHE_NAMESPACE == "rag:v5"
+    assert CACHE_NAMESPACE == "rag:v6"
     assert cache.get("legacy") is None
     assert cache.flush() == 2
     assert client.deleted_keys == current_keys
