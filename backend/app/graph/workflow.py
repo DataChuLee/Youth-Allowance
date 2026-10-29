@@ -10,6 +10,7 @@ from app.core.cache import get_query_cache
 from app.core.config import Settings, get_settings
 from app.core.errors import IndexMissingError
 from app.graph.state import EvidenceDecision, GraphState, IntentDecision
+from app.rag.blocker_check import ConfirmBlockers, create_blocker_confirmer
 from app.rag.evidence import GradeEvidence, grade_evidence as grade_pdf_evidence
 from app.rag.generation import (
     build_blocked_answer,
@@ -74,6 +75,7 @@ class ChatGraphDependencies:
     plan_search_queries: PlanSearchQueries
     retrieve_documents: RetrieveDocuments
     grade_evidence: GradeEvidence | None
+    confirm_blockers: ConfirmBlockers | None
     generate_answer: GenerateAnswer
     generate_policy_answer: GeneratePolicyAnswer
     settings: Settings
@@ -271,12 +273,15 @@ def grade_evidence_node(
     return node
 
 
-def resolve_policy_node(*, final: bool) -> Callable[[GraphState], GraphState]:
+def resolve_policy_node(
+    *, final: bool, confirm_blockers: ConfirmBlockers | None = None
+) -> Callable[[GraphState], GraphState]:
     def node(state: GraphState) -> GraphState:
         state.policy = resolve_policy_decision(
             state.question,
             documents_from_state(state),
             state.evidence if final else None,
+            confirm_blockers,
         )
         return state
 
@@ -364,6 +369,7 @@ def build_chat_graph(
     settings: Settings,
     use_query_expansion: bool = True,
     use_policy_context_generation: bool = True,
+    confirm_blockers: ConfirmBlockers | None = None,
 ):
     graph = StateGraph(GraphState)
     graph.add_node("classify_intent", classify_intent_node(classify_intent))
@@ -373,7 +379,10 @@ def build_chat_graph(
         "retrieve_pdf",
         retrieve_pdf_node(retrieve_documents, settings, use_query_expansion),
     )
-    graph.add_node("resolve_policy_precheck", resolve_policy_node(final=False))
+    graph.add_node(
+        "resolve_policy_precheck",
+        resolve_policy_node(final=False, confirm_blockers=confirm_blockers),
+    )
     graph.add_node("grade_evidence", grade_evidence_node(grade_evidence, settings))
     graph.add_node("resolve_policy", resolve_policy_node(final=True))
     graph.add_node("generate_blocked_answer", generate_policy_blocked_answer_node())
@@ -430,6 +439,7 @@ def resolve_chat_graph_dependencies(
     plan_search_queries: PlanSearchQueries | None = None,
     retrieve_documents: RetrieveDocuments | None = None,
     grade_evidence: GradeEvidence | None = None,
+    confirm_blockers: ConfirmBlockers | None = None,
     generate_answer: GenerateAnswer | None = None,
     generate_policy_answer: GeneratePolicyAnswer | None = None,
     settings: Settings | None = None,
@@ -464,6 +474,13 @@ def resolve_chat_graph_dependencies(
             documents,
             settings=resolved_settings,
         )
+    if confirm_blockers is not None:
+        resolved_confirm_blockers = confirm_blockers
+    elif retrieve_documents is not None or resolved_settings.app_env == "test":
+        # 주입 테스트는 기존 키워드 차단 동작을 그대로 검증한다.
+        resolved_confirm_blockers = None
+    else:
+        resolved_confirm_blockers = create_blocker_confirmer(resolved_settings)
     resolved_generate_answer = generate_answer or (
         lambda query, documents: generate_pdf_answer(query, documents, resolved_settings)
     )
@@ -483,6 +500,7 @@ def resolve_chat_graph_dependencies(
         plan_search_queries=resolved_plan_search_queries,
         retrieve_documents=resolved_retrieve_documents,
         grade_evidence=resolved_grade_evidence,
+        confirm_blockers=resolved_confirm_blockers,
         generate_answer=resolved_generate_answer,
         generate_policy_answer=resolved_generate_policy_answer,
         settings=resolved_settings,
@@ -497,6 +515,7 @@ def run_chat_graph(
     plan_search_queries: PlanSearchQueries | None = None,
     retrieve_documents: RetrieveDocuments | None = None,
     grade_evidence: GradeEvidence | None = None,
+    confirm_blockers: ConfirmBlockers | None = None,
     generate_answer: GenerateAnswer | None = None,
     generate_policy_answer: GeneratePolicyAnswer | None = None,
     settings: Settings | None = None,
@@ -509,6 +528,7 @@ def run_chat_graph(
         plan_search_queries=plan_search_queries,
         retrieve_documents=retrieve_documents,
         grade_evidence=grade_evidence,
+        confirm_blockers=confirm_blockers,
         generate_answer=generate_answer,
         generate_policy_answer=generate_policy_answer,
         settings=settings,
@@ -523,6 +543,7 @@ def run_chat_graph(
         settings=dependencies.settings,
         use_query_expansion=dependencies.use_query_expansion,
         use_policy_context_generation=dependencies.use_policy_context_generation,
+        confirm_blockers=dependencies.confirm_blockers,
     )
     # thread_id는 요청 상관관계 식별자로만 받고 서버 상태 저장에는 사용하지 않는다.
     _ = thread_id
@@ -544,6 +565,7 @@ def prepare_chat_stream(
     plan_search_queries: PlanSearchQueries | None = None,
     retrieve_documents: RetrieveDocuments | None = None,
     grade_evidence: GradeEvidence | None = None,
+    confirm_blockers: ConfirmBlockers | None = None,
     generate_answer: GenerateAnswer | None = None,
     generate_policy_answer: GeneratePolicyAnswer | None = None,
     settings: Settings | None = None,
@@ -556,6 +578,7 @@ def prepare_chat_stream(
         plan_search_queries=plan_search_queries,
         retrieve_documents=retrieve_documents,
         grade_evidence=grade_evidence,
+        confirm_blockers=confirm_blockers,
         generate_answer=generate_answer,
         generate_policy_answer=generate_policy_answer,
         settings=settings,
@@ -587,6 +610,7 @@ def prepare_chat_stream(
         settings=dependencies.settings,
         use_query_expansion=dependencies.use_query_expansion,
         use_policy_context_generation=dependencies.use_policy_context_generation,
+        confirm_blockers=dependencies.confirm_blockers,
     )
     _ = thread_id
     recent_history = list(history or [])[-4:]
