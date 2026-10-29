@@ -69,6 +69,8 @@ EVIDENCE_GRADER_SYSTEM_PROMPT = """너는 청년수당 안내책자 RAG의 evide
 - direct: 질문에 직접 답하는 문구가 있음
 - inferable: 특정 브랜드명/상품명은 없지만, 일반 규정으로 제한적 답변 가능
 - insufficient: 검색 근거만으로 답변 불가
+- is_sufficient는 답이 "가능"인지 "불가"인지와 무관하다. 근거로 "불가"라고 답할 수 있으면 is_sufficient는 true다.
+- 질문 대상이 사용 불가 업종·항목 목록에 있으면 direct로 판단하고, 그 목록이 있는 청크를 source_chunk_ids에 넣는다.
 
 중요한 도메인 규칙:
 - 식비는 생활비 항목에 포함된다.
