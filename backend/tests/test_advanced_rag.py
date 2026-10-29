@@ -45,15 +45,22 @@ def test_build_search_queries_includes_original_and_deduplicates_planned_queries
     queries = build_search_queries(
         "청년수당으로 배민 결제 가능해?",
         plan_query=fake_plan,
-        max_queries=4,
+        max_queries=5,
     )
 
     assert queries == [
         "청년수당으로 배민 결제 가능해?",
+        "청년수당 클린카드 사용 불가 업종 청년수당 배달앱 식비 온라인 카드 결제 가능 여부",
         "청년수당 배달앱 식비 온라인 카드 결제 가능 여부",
         "청년수당 카드 사용 가능 항목 식비 생활비",
         "청년수당 간편결제 포인트 충전 상품권 기프티콘 사용 불가",
     ]
+
+
+def test_build_search_queries_falls_back_to_question_for_restriction_query() -> None:
+    queries = build_search_queries("대학원 등록금 돼요?", plan_query=lambda _: QueryPlan())
+
+    assert queries == ["대학원 등록금 돼요?", "청년수당 클린카드 사용 불가 업종 대학원 등록금 돼요?"]
 
 
 def test_build_policy_evidence_queries_uses_canonical_secondhand_policy_terms() -> None:
