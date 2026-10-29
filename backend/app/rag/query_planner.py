@@ -15,6 +15,8 @@ class QueryPlan(BaseModel):
 
 
 PlanQuery = Callable[[str], QueryPlan | dict]
+# "X에 써도 되나요?"는 사용 가능 항목 청크와 가깝게 임베딩되어 사용 불가 업종 목록이 검색되지 않는다.
+RESTRICTION_QUERY_PREFIX = "청년수당 클린카드 사용 불가 업종"
 
 
 def normalize_query(query: object) -> str:
@@ -46,12 +48,15 @@ def build_search_queries(
     question: str,
     plan_query: PlanQuery | None = None,
     settings: Settings | None = None,
-    max_queries: int = 5,
+    max_queries: int = 6,
 ) -> list[str]:
     resolved_plan_query = plan_query or create_query_planner(settings)
     planned = QueryPlan.model_validate(resolved_plan_query(question))
+    # 사용 불가 목록 대조 질의는 원 질문 바로 뒤에 둔다. 검색 결과를 질의 순서대로 번갈아 합치고
+    # 문서 수를 자르므로, 뒤에 두면 잘려 나간다.
     candidates = [
         question,
+        f"{RESTRICTION_QUERY_PREFIX} {planned.rewritten_query or question}",
         planned.rewritten_query,
         *planned.queries,
     ]
