@@ -159,8 +159,9 @@ def test_create_ensemble_retriever_loads_faiss_index_and_builds_bm25_from_docsto
 
     class FakeBM25Retriever:
         @classmethod
-        def from_documents(cls, documents: list[Document]) -> FakeRetriever:
+        def from_documents(cls, documents: list[Document], **kwargs: object) -> FakeRetriever:
             captured["bm25_documents"] = documents
+            captured["bm25_kwargs"] = kwargs
             return bm25_retriever
 
     index_dir = tmp_path / "faiss_rag_final"
@@ -185,6 +186,7 @@ def test_create_ensemble_retriever_loads_faiss_index_and_builds_bm25_from_docsto
     results = hybrid_retriever.invoke("1566-3344")
 
     assert [document.metadata["chunk_id"] for document in results] == ["bm25-id", "vector-id"]
+    assert captured["bm25_kwargs"] == {"preprocess_func": retrieval.tokenize_for_bm25}
     assert captured["embedding_kwargs"] == {
         "api_key": "test-key",
         "model": "test-embedding-model",
@@ -305,3 +307,23 @@ def test_retrieve_pdf_documents_with_ensemble_returns_rank_scored_documents(monk
 
     assert [item.document.metadata["chunk_id"] for item in results] == ["top", "tail"]
     assert [item.score for item in results] == [1.0, 0.99]
+
+
+def test_tokenize_for_bm25_splits_korean_into_bigrams_and_keeps_ascii_words() -> None:
+    assert retrieval.tokenize_for_bm25("노래방에서 ATM 1566-3344") == [
+        "노래", "래방", "방에", "에서", "atm", "1566", "3344",
+    ]
+    assert retrieval.tokenize_for_bm25("<td>카지노,</td> 및") == ["td", "카지", "지노", "td", "및"]
+
+
+def test_bm25_with_korean_bigrams_matches_question_with_particle() -> None:
+    from langchain_community.retrievers import BM25Retriever
+
+    documents = [
+        Document(page_content="| 24 | 노래방 | 25 | 비디오방 |", metadata={"chunk_id": "table"}),
+        Document(page_content="자기성장기록서는 매월 제출합니다.", metadata={"chunk_id": "report"}),
+        Document(page_content="월세와 관리비는 계좌이체로 낼 수 있습니다.", metadata={"chunk_id": "rent"}),
+    ]
+    bm25 = BM25Retriever.from_documents(documents, preprocess_func=retrieval.tokenize_for_bm25, k=1)
+
+    assert bm25.invoke("노래방에서 쓴 돈")[0].metadata["chunk_id"] == "table"
