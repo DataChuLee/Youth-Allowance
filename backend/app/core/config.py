@@ -6,8 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = BACKEND_DIR.parent
-DEFAULT_PDF_PATH = PROJECT_ROOT / "Data" / "청년수당 참여자 안내책자.pdf"
-DEFAULT_CHROMA_DIR = BACKEND_DIR / "storage" / "chroma"
+DEFAULT_OCR_JSONL_PATH = PROJECT_ROOT / "Data" / "upstage_youth_allowance_parse.jsonl"
 DEFAULT_FAISS_INDEX_DIR = BACKEND_DIR / "faiss_rag_final"
 DEFAULT_ENV_FILE = PROJECT_ROOT / ".env"
 DEFAULT_OPENAI_CHAT_MODEL = "gpt-4o-mini"
@@ -23,8 +22,7 @@ class Settings(BaseSettings):
     openai_embedding_model: str = Field(
         default=DEFAULT_OPENAI_EMBEDDING_MODEL, alias="OPENAI_EMBEDDING_MODEL"
     )
-    pdf_path: Path = Field(default=DEFAULT_PDF_PATH, alias="PDF_PATH")
-    chroma_dir: Path = Field(default=DEFAULT_CHROMA_DIR, alias="CHROMA_DIR")
+    ocr_jsonl_path: Path = Field(default=DEFAULT_OCR_JSONL_PATH, alias="OCR_JSONL_PATH")
     faiss_index_dir: Path = Field(default=DEFAULT_FAISS_INDEX_DIR, alias="FAISS_INDEX_DIR")
     langsmith_tracing: bool = Field(default=False, alias="LANGSMITH_TRACING")
     langsmith_api_key: str | None = Field(default=None, alias="LANGSMITH_API_KEY")
