@@ -16,7 +16,7 @@
 
 ## 주요 기능
 
-- PDF 안내책자 텍스트 추출 및 Chroma 벡터 인덱싱
+- 안내책자 OCR 결과(Upstage) 기반 시맨틱 청킹 및 FAISS 벡터 인덱싱
 - 사용자 질문에 대한 PDF 기반 질의응답
 - 답변별 출처 페이지, 청크 ID, 관련 문단 excerpt 표시
 - LangGraph 기반 RAG 처리 흐름 구성
@@ -32,7 +32,7 @@
 | Frontend | Next.js, React, TypeScript, Vitest |
 | Backend | FastAPI, Python, Pydantic |
 | RAG | LangChain, LangGraph |
-| Vector Store | Chroma |
+| Vector Store | FAISS + BM25 (RRF) |
 | LLM | OpenAI Chat Model, OpenAI Embeddings |
 | Observability | LangSmith optional tracing |
 | Test | pytest, Vitest |
@@ -56,7 +56,7 @@ flowchart LR
 
 1. 사용자가 프론트엔드에서 질문을 입력합니다.
 2. 프론트엔드는 기본적으로 `POST /api/v1/chat/stream`으로 질문, 탭 단위 `thread_id`, 최근 대화 최대 4개를 전달합니다.
-3. 백엔드는 FAISS와 BM25 결과를 RRF로 결합해 PDF 청크를 검색합니다. FAISS 장애 시 로컬 PDF 텍스트 기반 BM25를 시도합니다.
+3. 백엔드는 FAISS와 BM25 결과를 RRF로 결합해 PDF 청크를 검색합니다. FAISS 인덱스가 없으면 `index_missing`을 반환합니다.
 4. LangGraph 워크플로가 검색 결과의 근거 충분성을 판단합니다.
 5. 근거가 충분하면 PDF 근거만 사용해 답변을 생성하고, 스트리밍 요청에서는 답변 토큰을 순차적으로 보냅니다.
 6. 근거가 부족하면 답변을 추측하지 않고 fallback 응답을 반환합니다.
@@ -181,12 +181,12 @@ Data/
 ```env
 OPENAI_API_KEY=...
 OPENAI_CHAT_MODEL=gpt-4o-mini
-OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+OPENAI_EMBEDDING_MODEL=text-embedding-3-large
 LANGSMITH_TRACING=false
 LANGSMITH_API_KEY=...
 LANGSMITH_PROJECT=youth-allowance-rag
-PDF_PATH=Data/청년수당 참여자 안내책자.pdf
-CHROMA_DIR=backend/storage/chroma
+OCR_JSONL_PATH=Data/upstage_youth_allowance_parse.jsonl
+FAISS_INDEX_DIR=backend/faiss_rag_final
 RETRIEVAL_TOP_K=5
 MIN_SIMILARITY_SCORE=0.2
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
@@ -213,12 +213,12 @@ npm run build
 npm run dev
 ```
 
-프론트엔드는 기본적으로 `http://localhost:3000`에서 실행됩니다.
+프론트엔드는 기본적으로 `http://localhost:3001`에서 실행됩니다.
 
 ## 검증 항목
 
 - `/health`가 정상 응답을 반환하는지 확인
-- PDF 인덱싱 후 Chroma 저장소가 생성되는지 확인
+- 인덱싱 후 `backend/faiss_rag_final/`에 `index.faiss`, `index.pkl`, `manifest.json`이 생성되는지 확인
 - `/chat`이 `answer`, `sources`, `status`, `needs_external_search`를 반환하는지 확인
 - `/chat/stream`이 `token` 이벤트와 최종 `done` 이벤트를 반환하는지 확인
 - PDF 근거가 있는 질문에서 페이지와 excerpt가 표시되는지 확인
@@ -233,7 +233,7 @@ npm run dev
 
 ## 보안 및 제한사항
 
-- `.env`, `venv/`, `Data/`, Chroma 저장소는 Git에 포함하지 않습니다.
+- `.env`, `venv/`, `Data/`, FAISS 인덱스는 Git에 포함하지 않습니다.
 - OpenAI API Key와 LangSmith API Key는 로그에 출력하지 않습니다.
 - 질문, 최근 대화 `history`, 답변, 출처 본문은 기본 애플리케이션 로그에 기록하지
   않습니다. Redis 연결 로그에도 URL이나 인증정보를 남기지 않습니다.
@@ -246,15 +246,17 @@ npm run dev
   `backend/` 내부 고정 경로에서 신뢰할 수 있는 indexing 과정으로 직접 생성한 두
   파일만 로드합니다. 다운로드했거나 출처와 무결성을 확인하지 않은 FAISS 인덱스는
   절대 배치하거나 로드하지 않습니다.
-- FAISS 장애 시 로컬 PDF 텍스트로 만든 BM25 corpus는 프로세스 메모리에 최대 4개만
-  보관하며, PDF 경로·수정 시각·파일 크기가 같을 때만 재사용합니다.
-- OCR은 포함하지 않으며, 이미지 기반 PDF는 별도 전처리가 필요합니다.
+- 안내책자 PDF는 텍스트 레이어가 없는 이미지 기반이므로, 인덱싱은 Upstage OCR
+  결과(`Data/upstage_youth_allowance_parse.jsonl`)를 입력으로 사용합니다. OCR 실행
+  자체는 인덱싱 명령에 포함되지 않습니다.
+- 인덱싱은 `manifest.json`에 임베딩 모델, 청킹 설정, 입력 파일 해시, 청크 해시,
+  커밋 SHA를 기록합니다. 평가 결과는 이 manifest와 함께 보관합니다.
 - 외부 공식 출처 검색은 MVP 이후 확장 기능으로 분리했습니다.
 
 ## 향후 개선
 
 - 서울시 또는 공식 청년수당 안내 페이지 검색 연동
-- 이미지 기반 PDF를 위한 OCR 전처리
+- OCR 실행을 인덱싱 파이프라인에 통합
 - 관리자용 문서 업로드 및 재인덱싱 기능
 - 답변 품질 평가 자동화
 - 배포 환경 구성 및 운영 모니터링
