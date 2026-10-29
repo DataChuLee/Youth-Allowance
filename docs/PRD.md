@@ -25,7 +25,7 @@ MVP는 공개 운영 서비스가 아니라 로컬 개발 및 데모를 목표�
 - `청년수당 참여자 안내책자.pdf`를 1차 근거로 답변한다.
 - 모든 정상 답변에 PDF 페이지 번호와 관련 문단 excerpt를 표시한다.
 - OpenAI API로 임베딩과 답변 생성을 수행한다.
-- LangChain으로 PDF 로딩, 청크 분할, 임베딩, Chroma 연동을 처리한다.
+- LangChain으로 OCR 결과 로딩, 시맨틱 청킹, 임베딩, FAISS 연동을 처리한다.
 - LangGraph로 질문 처리 흐름을 구성한다.
 - `.env`에 LangSmith 설정이 있으면 추적을 활성화한다.
 - 대화 기록은 브라우저 세션 상태에만 유지한다.
@@ -46,7 +46,7 @@ MVP는 다음을 포함한다.
 
 - FastAPI 백엔드.
 - Next.js 프론트엔드.
-- 로컬 Chroma 벡터 저장소.
+- 로컬 FAISS 벡터 저장소와 BM25 하이브리드 검색.
 - PDF indexing 명령.
 - `GET /health` API.
 - canonical `POST /api/v1/chat` API와 deprecated 호환 `POST /chat` API.
@@ -100,7 +100,7 @@ UI에는 다음 요소가 포함된다.
   - chunk_id.
   - chunk text.
 - OpenAI embeddings로 벡터를 생성해야 한다.
-- 벡터와 메타데이터를 로컬 Chroma 디렉터리에 저장해야 한다.
+- 벡터와 메타데이터를 로컬 FAISS 디렉터리에 저장해야 한다.
 - PDF가 없거나 읽을 수 없으면 명확한 오류를 반환해야 한다.
 - indexing 완료 후 다음 품질 지표를 콘솔에 출력해야 한다.
   - 전체 페이지 수.
@@ -267,7 +267,7 @@ data: {"answer":"청년수당은 안내책자 근거에 따라 사용할 수 있
 
 MVP는 다음 조건을 만족하면 성공으로 본다.
 
-- indexing 명령이 PDF에서 재사용 가능한 Chroma 인덱스를 생성한다.
+- indexing 명령이 안내책자 OCR 결과에서 재사용 가능한 FAISS 인덱스를 생성한다.
 - indexing 결과에 페이지 수, 빈 페이지 수, 추출 문자 수, 청크 수가 표시된다.
 - 백엔드가 실행되고 health check에 응답한다.
 - 프론트엔드가 실행되고 백엔드와 통신한다.
