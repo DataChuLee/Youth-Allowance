@@ -76,3 +76,20 @@ def test_parse_judge_label_rejects_unknown_labels() -> None:
     assert parse_judge_label('{"label": "deny", "reason": "r"}') == "DENY"
     assert parse_judge_label('{"label": "MAYBE"}') == "PARSE_ERROR"
     assert parse_judge_label("not json") == "PARSE_ERROR"
+
+
+def test_aggregate_runs_flags_items_unsafe_in_any_run_and_label_flips() -> None:
+    from benchmarks.aggregate_eval_v1 import aggregate_runs
+
+    cases = [make_case("n1", "not_allowed", "no"), make_case("n2", "not_allowed", "no")]
+    answers = {"n1": {"status": "answered_from_pdf"}, "n2": {"status": "answered_from_pdf"}}
+    runs = [
+        (answers, {"n1": "DENY", "n2": "DENY"}),
+        (answers, {"n1": "ALLOW", "n2": "DENY"}),
+    ]
+
+    result = aggregate_runs(cases, runs)
+
+    assert result["metrics"]["unsafe_allow"]["k_per_run"] == [0, 1]
+    assert result["unsafe_allow_any_run"]["ids"] == ["n1"]
+    assert result["label_flip"]["ids"] == ["n1"]
