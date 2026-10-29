@@ -14,8 +14,8 @@ from app.graph.state import RetrievedDocument
 
 logger = logging.getLogger(__name__)
 
-# 직렬화 형식이나 검색 결과가 바뀌면 namespace를 올려 이전 결과와 섞이지 않게 한다(v6: BM25 한글 bigram).
-CACHE_NAMESPACE = "rag:v6"
+# 직렬화 형식이나 검색 결과가 바뀌면 namespace를 올려 이전 결과와 섞이지 않게 한다(v7: 사용 불가 목록 대조 질의).
+CACHE_NAMESPACE = "rag:v7"
 CACHE_KEY_PREFIX = f"{CACHE_NAMESPACE}:"
 CACHE_SCHEMA_VERSION = 1
 
