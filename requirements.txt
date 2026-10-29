@@ -16,8 +16,6 @@ cachetools==5.4.0
 certifi==2024.7.4
 cffi==1.17.0
 charset-normalizer==3.3.2
-chroma-hnswlib==0.7.6
-chromadb==1.5.5
 cleo==2.1.0
 click==8.1.7
 colorama==0.4.6
@@ -78,10 +76,10 @@ kiwipiepy_model==0.18.0
 konlpy==0.6.0
 kubernetes==30.1.0
 langchain==1.2.13
-langchain-chroma==1.1.0
 langchain-classic==1.0.3
 langchain-community==0.4.1
 langchain-core==1.2.23
+langchain-experimental==0.4.1
 langchain-openai==1.1.12
 langchain-teddynote==0.0.19
 langchain-text-splitters==1.1.1
@@ -160,8 +158,6 @@ pydantic-settings==2.13.1
 pydantic_core==2.41.5
 pydeck==0.9.1
 Pygments==2.18.0
-PyMuPDF==1.24.9
-PyMuPDFb==1.24.9
 pypdfium2==4.30.0
 PyPika==0.48.9
 pyproject_hooks==1.1.0
