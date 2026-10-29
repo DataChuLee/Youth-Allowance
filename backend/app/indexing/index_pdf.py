@@ -1,135 +1,84 @@
-from pathlib import Path
+import hashlib
+import json
+import subprocess
 import sys
-import base64
-from dotenv import load_dotenv
+from datetime import datetime, timezone
+from pathlib import Path
 
-from langchain_chroma import Chroma
-from langchain_community.document_loaders import PyPDFLoader
+from dotenv import load_dotenv
+from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
+from langchain_experimental.text_splitter import SemanticChunker
 from langchain_openai import OpenAIEmbeddings
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from openai import OpenAI
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from app.core.config import Settings, get_settings
+from app.core.config import PROJECT_ROOT, get_settings
 from app.core.errors import IndexingError
 from app.indexing.quality import (
     IndexingStats,
     format_indexing_stats,
     validate_indexing_stats,
 )
+from app.rag.retrieval import resolve_trusted_faiss_index_dir
 
 load_dotenv()
 
 BOOKLET_TITLE = "청년수당 참여자 안내책자"
-OCR_MODEL = "gpt-4o-mini"
+# 기준선(baseline) 청킹 설정. 바꾸면 manifest.json으로 실험 결과와 짝지을 수 있다.
+CHUNKER_CONFIG = {
+    "type": "semantic",
+    "scope": "page",
+    "breakpoint_threshold_type": "percentile",
+    "breakpoint_threshold_amount": 85,
+}
+MANIFEST_FILENAME = "manifest.json"
 
 
-def build_chunk_id(page: int, index: int) -> str:
-    return f"pdf-page-{page}-chunk-{index}"
+def build_chunk_id(index: int) -> str:
+    return f"sem_{index:04d}"
 
 
-def load_pdf_pages(pdf_path: Path) -> list[Document]:
-    if not pdf_path.exists():
-        raise IndexingError(f"PDF 파일을 찾을 수 없습니다: {pdf_path}")
+def load_ocr_pages(jsonl_path: Path) -> list[Document]:
+    """Upstage OCR JSONL(한 줄에 한 페이지)을 페이지 문서로 읽는다."""
+    if not jsonl_path.is_file():
+        raise IndexingError(f"OCR JSONL 파일을 찾을 수 없습니다: {jsonl_path}")
 
-    loader = PyPDFLoader(str(pdf_path))
-    pages = loader.load()
-    if pages and any(page.page_content.strip() for page in pages):
-        return pages
-    return load_pdf_pages_with_ocr(pdf_path)
-
-
-def load_pdf_pages_with_ocr(pdf_path: Path, settings: Settings | None = None) -> list[Document]:
-    settings = settings or get_settings()
-    try:
-        import fitz
-    except ImportError as exc:
-        raise IndexingError(
-            "PDF 텍스트를 추출하지 못했습니다. 이미지 기반 PDF OCR을 위해 pymupdf 설치가 필요합니다."
-        ) from exc
-
-    client = OpenAI(api_key=settings.openai_api_key)
-    pdf = fitz.open(str(pdf_path))
     pages: list[Document] = []
-
-    try:
-        for page_index in range(pdf.page_count):
-            page = pdf.load_page(page_index)
-            pixmap = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
-            image_bytes = pixmap.tobytes("png")
-            text = extract_text_from_page_image(client, image_bytes)
-            pages.append(
-                Document(
-                    page_content=text,
-                    metadata={"page": page_index, "source": str(pdf_path)},
-                )
-            )
-    finally:
-        pdf.close()
-
+    with jsonl_path.open(encoding="utf-8") as file:
+        for line in file:
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            page = int(row.get("metadata", {}).get("page", len(pages) + 1))
+            pages.append(Document(page_content=row["page_content"], metadata={"page": page}))
     return pages
 
 
-def extract_text_from_page_image(client: OpenAI, image_bytes: bytes) -> str:
-    encoded_image = base64.b64encode(image_bytes).decode("ascii")
-    response = client.chat.completions.create(
-        model=OCR_MODEL,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "이미지에 보이는 한국어 문서를 OCR로 전사하세요. "
-                    "문서에 없는 내용을 추가하지 말고, 읽을 수 없는 부분은 생략하세요."
-                ),
-            },
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": "이 페이지의 모든 읽을 수 있는 텍스트를 줄바꿈을 유지해 전사하세요.",
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/png;base64,{encoded_image}",
-                            "detail": "high",
-                        },
-                    },
-                ],
-            },
-        ],
-    )
-    return response.choices[0].message.content or ""
-
-
-def split_pages(pages: list[Document]) -> list[Document]:
-    splitter = RecursiveCharacterTextSplitter(chunk_size=900, chunk_overlap=150)
-    chunks: list[Document] = []
-    per_page_counts: dict[int, int] = {}
-
-    for page in pages:
-        page_number = int(page.metadata.get("page", 0)) + 1
-        page_chunks = splitter.split_documents([page])
-
-        for page_chunk in page_chunks:
-            index = per_page_counts.get(page_number, 0)
-            per_page_counts[page_number] = index + 1
-            chunk_id = build_chunk_id(page_number, index)
-            page_chunk.metadata.update(
-                {
-                    "source": str(page.metadata.get("source", "")),
-                    "title": BOOKLET_TITLE,
-                    "page": page_number,
-                    "chunk_id": chunk_id,
-                }
-            )
-            chunks.append(page_chunk)
-
+def assign_chunk_metadata(chunks: list[Document], source: str) -> list[Document]:
+    # 빈 청크를 먼저 버린 뒤 번호를 매겨야 sem_ ID가 문서 순서대로 연속된다.
+    chunks = [chunk for chunk in chunks if chunk.page_content.strip()]
+    for index, chunk in enumerate(chunks):
+        chunk.metadata.update(
+            {"chunk_id": build_chunk_id(index), "title": BOOKLET_TITLE, "source": source}
+        )
     return chunks
+
+
+def split_pages_semantic(pages: list[Document], embeddings, source: str) -> list[Document]:
+    # 페이지 안에서 의미가 크게 바뀌는 지점(문장 간 임베딩 거리 상위 15%)에서 자른다.
+    splitter = SemanticChunker(
+        embeddings,
+        breakpoint_threshold_type=CHUNKER_CONFIG["breakpoint_threshold_type"],
+        breakpoint_threshold_amount=CHUNKER_CONFIG["breakpoint_threshold_amount"],
+    )
+    chunks: list[Document] = []
+    for page in pages:
+        chunks.extend(
+            splitter.create_documents([page.page_content], metadatas=[dict(page.metadata)])
+        )
+    return assign_chunk_metadata(chunks, source)
 
 
 def collect_stats(pages: list[Document], chunks: list[Document]) -> IndexingStats:
@@ -150,23 +99,64 @@ def collect_stats(pages: list[Document], chunks: list[Document]) -> IndexingStat
     )
 
 
+def sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def current_git_commit() -> str | None:
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def build_manifest(
+    chunks: list[Document], source_sha256: str, embedding_model: str
+) -> dict:
+    """실험 결과를 어떤 인덱스로 측정했는지 추적하기 위한 메타데이터. 원문은 넣지 않는다."""
+    chunk_digest = sha256_text(
+        "\n".join(f"{c.metadata['chunk_id']}\t{c.page_content}" for c in chunks)
+    )
+    return {
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "git_commit": current_git_commit(),
+        "source_sha256": source_sha256,
+        "embedding_model": embedding_model,
+        "chunker": CHUNKER_CONFIG,
+        "chunk_count": len(chunks),
+        "chunks_sha256": chunk_digest,
+    }
+
+
 def index_pdf() -> IndexingStats:
     settings = get_settings()
-    pages = load_pdf_pages(settings.pdf_path)
-    chunks = split_pages(pages)
-    stats = collect_stats(pages, chunks)
-    validate_indexing_stats(stats)
-
+    # 상대 경로는 실행 위치와 무관하게 프로젝트 루트 기준으로 해석한다(서비스 로드 규칙과 동일).
+    jsonl_path = PROJECT_ROOT / settings.ocr_jsonl_path
+    index_dir = resolve_trusted_faiss_index_dir(settings.faiss_index_dir)
+    pages = load_ocr_pages(jsonl_path)
     embeddings = OpenAIEmbeddings(
         api_key=settings.openai_api_key,
         model=settings.openai_embedding_model,
     )
-    Chroma.from_documents(
-        documents=chunks,
+    chunks = split_pages_semantic(pages, embeddings, jsonl_path.name)
+    stats = collect_stats(pages, chunks)
+    validate_indexing_stats(stats)
+
+    vector_store = FAISS.from_documents(
+        chunks,
+        embeddings,
         ids=[str(chunk.metadata["chunk_id"]) for chunk in chunks],
-        embedding=embeddings,
-        persist_directory=str(settings.chroma_dir),
-        collection_name="youth_allowance_booklet",
+    )
+    vector_store.save_local(str(index_dir))
+    manifest = build_manifest(
+        chunks,
+        hashlib.sha256(jsonl_path.read_bytes()).hexdigest(),
+        settings.openai_embedding_model,
+    )
+    (index_dir / MANIFEST_FILENAME).write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     return stats
 
