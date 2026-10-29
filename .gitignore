@@ -17,6 +17,7 @@ frontend/.next/
 # 로컬 벡터 인덱스와 재생성 가능한 검색 산출물
 /backend/faiss_langchain_index/
 /backend/faiss_rag_final/
+/backend/faiss_rag_table_split/
 /backend/*.index
 
 # 평가 실행 결과는 코드·고정 데이터셋과 분리한다.
