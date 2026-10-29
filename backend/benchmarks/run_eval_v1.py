@@ -29,6 +29,11 @@ BENCHMARK_DIR = Path(__file__).resolve().parent
 CASES_PATH = BENCHMARK_DIR / "datasets" / "eval_test_v1.jsonl"
 RESULTS_DIR = BENCHMARK_DIR / "results"
 BASELINE_CHUNKS_SHA256 = "8fc01b77bf3db6254657f6bf176922aee4130d1913854a21eaaad2cc7768a49d"
+# 측정을 허용하는 인덱스. 실험 인덱스는 기준선 청크에서 한 가지만 바꿔 만든 것만 등록한다.
+KNOWN_INDEXES = {
+    BASELINE_CHUNKS_SHA256: "baseline_18fec50",
+    "92ec3482d081366f477bd7adcb0f939bd68a739b787902e25d656135e7d324d3": "table_split",
+}
 JUDGE_MODEL = "gpt-4.1-2025-04-14"
 SAMPLE_SIZE = 30
 
@@ -52,12 +57,13 @@ def load_index_manifest() -> dict[str, Any]:
 
     index_dir = resolve_trusted_faiss_index_dir(get_settings().faiss_index_dir)
     manifest = json.loads((index_dir / "manifest.json").read_text(encoding="utf-8"))
-    # 재생성한 인덱스는 청크 경계가 달라지므로, 고정한 기준선이 아니면 측정을 거부한다.
-    if manifest["chunks_sha256"] != BASELINE_CHUNKS_SHA256:
+    # 재생성한 인덱스는 청크 경계가 달라지므로, 등록한 인덱스가 아니면 측정을 거부한다.
+    name = KNOWN_INDEXES.get(manifest["chunks_sha256"])
+    if name is None:
         raise SystemExit(
-            "현재 FAISS 인덱스가 기준선과 다릅니다. Data/faiss_rag_baseline_18fec50을 복원하세요."
+            "현재 FAISS 인덱스가 등록된 인덱스가 아닙니다. Data/faiss_rag_baseline_18fec50을 복원하세요."
         )
-    return manifest
+    return {**manifest, "name": name}
 
 
 def disable_query_cache() -> None:
