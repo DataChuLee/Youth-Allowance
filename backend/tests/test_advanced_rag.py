@@ -1,7 +1,8 @@
 from langchain_core.documents import Document
 
-from app.graph.state import EvidenceDecision, IntentDecision, RetrievedDocument
+from app.graph.state import EvidenceDecision, IntentDecision, PolicyBlocker, RetrievedDocument
 from app.graph.workflow import run_chat_graph
+from app.rag.blocker_check import select_confirmed_blockers
 from app.rag.evidence import grade_evidence
 from app.rag.intent import normalize_intent_decision
 from app.rag.policy import build_policy_evidence_queries
@@ -262,3 +263,52 @@ def test_run_chat_graph_skips_query_planner_for_explicit_policy_rule(monkeypatch
     )
 
     assert response.status == "blocked_by_policy"
+
+
+def test_select_confirmed_blockers_keeps_blockers_unless_explicitly_dismissed() -> None:
+    blockers = [
+        PolicyBlocker(key="non_purpose", label="제한", message="m"),
+        PolicyBlocker(key="voucher", label="제한", message="m"),
+    ]
+
+    kept = select_confirmed_blockers(
+        blockers,
+        {"checks": [
+            {"key": "non_purpose", "spend_matches": False, "payment_matches": False},
+            {"key": "voucher", "spend_matches": False, "payment_matches": True},
+        ]},
+    )
+
+    # 하나라도 해당하거나, key가 빠졌거나, 출력이 깨지면 안전을 위해 차단을 유지한다.
+    assert [blocker.key for blocker in kept] == ["voucher"]
+    assert select_confirmed_blockers(blockers, {"checks": [{"key": "bus_fare"}]}) == blockers
+    assert select_confirmed_blockers(blockers, {"checks": "no"}) == blockers
+    assert select_confirmed_blockers(blockers, None) == blockers
+
+
+def test_run_chat_graph_answers_when_confirmer_dismisses_keyword_blocker(monkeypatch) -> None:
+    from app.core.cache import DisabledQueryCache
+
+    monkeypatch.setattr("app.graph.workflow.get_query_cache", lambda: DisabledQueryCache())
+    document = make_retrieved_document(
+        "chunk-purpose",
+        "도박·게임 등 사행성 분야는 제한되며, 구직활동에 필요한 교육비는 사용할 수 있습니다.",
+    )
+    confirm_calls: list[str] = []
+
+    def dismiss_all(question: str, blockers: list[PolicyBlocker]) -> list[PolicyBlocker]:
+        confirm_calls.append(question)
+        return []
+
+    response = run_chat_graph(
+        "게임 프로그래밍 학원 수강료 되나요?",
+        classify_intent=lambda _: IntentDecision(intent="rag", reason="policy question"),
+        plan_search_queries=lambda question: [question],
+        retrieve_documents=lambda _: [document],
+        confirm_blockers=dismiss_all,
+        generate_answer=lambda _, __: "교육비로 사용할 수 있습니다.",
+    )
+
+    assert response.status == "answered_from_pdf"
+    # 최종 정책 판단에서 키워드 차단을 다시 검사하지 않아 확인기는 한 번만 호출된다.
+    assert len(confirm_calls) == 1
