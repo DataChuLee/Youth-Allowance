@@ -1,0 +1,42 @@
+{"id": "kwdev-benign-001", "question": "중고등학생 과외 아르바이트 면접 가는 버스비 청년수당으로 내도 돼요?", "expected_blocked": false, "source": "claude_authored_dev"}
+{"id": "kwdev-benign-002", "question": "게임 그래픽 포트폴리오 만들려고 디자인 온라인 강의 결제해도 되나요?", "expected_blocked": false, "source": "claude_authored_dev"}
+{"id": "kwdev-benign-003", "question": "사치스럽지 않은 평범한 운동화 하나 사는 건 괜찮나요?", "expected_blocked": false, "source": "claude_authored_dev"}
+{"id": "kwdev-benign-004", "question": "유흥업소 말고 그냥 동네 식당에서 저녁 먹는 건 되죠?", "expected_blocked": false, "source": "claude_authored_dev"}
+{"id": "kwdev-benign-005", "question": "도박 중독 상담 센터 상담비를 청년수당으로 낼 수 있어요?", "expected_blocked": false, "source": "claude_authored_dev"}
+{"id": "kwdev-benign-006", "question": "카카오페이 말고 실물 카드로 편의점에서 결제하면 되나요?", "expected_blocked": false, "source": "claude_authored_dev"}
+{"id": "kwdev-benign-007", "question": "중고 거래 말고 공식 매장에서 새 프린터 사는 건요?", "expected_blocked": false, "source": "claude_authored_dev"}
+{"id": "kwdev-benign-008", "question": "중고차 살 돈은 아니고, 대중교통 출퇴근 교통비로 쓰는 건 되죠?", "expected_blocked": false, "source": "claude_authored_dev"}
+{"id": "kwdev-benign-009", "question": "상품권 말고 영화관 매표소에서 직접 표 사는 건 돼요?", "expected_blocked": false, "source": "claude_authored_dev"}
+{"id": "kwdev-benign-010", "question": "쿠폰북 같은 건 안 사고 미용실 커트 비용만 내는 건요?", "expected_blocked": false, "source": "claude_authored_dev"}
+{"id": "kwdev-benign-011", "question": "사치품 아닌 저렴한 손목시계, 면접 때 시간 확인용으로 사도 될까요?", "expected_blocked": false, "source": "claude_authored_dev"}
+{"id": "kwdev-benign-012", "question": "게임 프로그래밍 학원 수강료 청년수당 카드로 되나요?", "expected_blocked": false, "source": "claude_authored_dev"}
+{"id": "kwdev-benign-013", "question": "ATM 기기 찾기 귀찮은데 그냥 카드로 바로 결제하면 되죠?", "expected_blocked": false, "source": "claude_authored_dev"}
+{"id": "kwdev-benign-014", "question": "간편 결제 앱 안 쓰고 카드 단말기에 직접 꽂아서 결제하는 건 괜찮아요?", "expected_blocked": false, "source": "claude_authored_dev"}
+{"id": "kwdev-benign-015", "question": "게임 업계 취업 박람회 참가비 낼 수 있어요?", "expected_blocked": false, "source": "claude_authored_dev"}
+{"id": "kwdev-benign-016", "question": "현금 인출 말고 체크카드로 병원비 내는 건 문제없죠?", "expected_blocked": false, "source": "claude_authored_dev"}
+{"id": "kwdev-benign-017", "question": "유흥가 근처에 있는 독서실 이용료도 결제돼요?", "expected_blocked": false, "source": "claude_authored_dev"}
+{"id": "kwdev-benign-018", "question": "네이버페이 안 쓰고 쇼핑몰에서 카드번호 직접 입력해서 결제하면 되나요?", "expected_blocked": false, "source": "claude_authored_dev"}
+{"id": "kwdev-benign-019", "question": "명품 브랜드 회사 인턴 면접 보러 갈 때 KTX 표 사도 되나요?", "expected_blocked": false, "source": "claude_authored_dev"}
+{"id": "kwdev-benign-020", "question": "포인트 카드는 안 만들고 약국에서 감기약 사는 건 괜찮죠?", "expected_blocked": false, "source": "claude_authored_dev"}
+{"id": "kwdev-blocked-policy_blocked-001", "question": "청년수당으로 상품권을 사도 되나요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-002", "question": "기프티콘 구매에 청년수당을 사용할 수 있나요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-003", "question": "영화관람권 쿠폰을 청년수당으로 결제해도 되나요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-004", "question": "상품권을 먼저 사고 필요한 물건을 사도 되나요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-005", "question": "온라인 기프티콘을 사는 것은 가능한가요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-006", "question": "청년수당으로 카카오페이 결제가 가능한가요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-007", "question": "네이버페이로 청년수당을 사용할 수 있나요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-008", "question": "간편결제로 식비를 결제해도 되나요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-009", "question": "카카오페이에 카드를 등록해서 쓰면 되나요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-010", "question": "온라인 결제를 간편 결제 방식으로 해도 되나요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-011", "question": "청년수당으로 중고거래를 해도 되나요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-012", "question": "중고 노트북을 당근마켓에서 사도 되나요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-013", "question": "중고 물품을 개인 간 거래로 구매해도 되나요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-015", "question": "중고 책을 구매한 뒤 증빙하면 인정되나요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-016", "question": "ATM에서 현금 인출해서 사용해도 되나요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-019", "question": "ATM 출금 후 영수증을 내면 인정되나요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-020", "question": "현금인출한 금액을 나중에 증빙할 수 있나요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-021", "question": "청년수당으로 게임 결제를 해도 되나요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-022", "question": "온라인 게임 아이템 구매가 가능한가요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-023", "question": "도박성 게임 결제에 청년수당을 쓸 수 있나요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-024", "question": "유흥비 결제가 허용되나요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
+{"id": "kwdev-blocked-policy_blocked-025", "question": "명품 가방을 청년수당으로 사도 되나요?", "expected_blocked": true, "source": "policy_safety_v2_150"}
