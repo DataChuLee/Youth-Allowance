@@ -6,9 +6,9 @@
 
 - 참여자용 채팅 UI를 제공하는 Next.js 프론트엔드.
 - API 라우팅과 RAG 실행을 담당하는 FastAPI 백엔드.
-- PDF 로딩, 텍스트 분할, 임베딩, Chroma 연동을 담당하는 LangChain.
+- OCR 결과 로딩, 시맨틱 청킹, 임베딩, FAISS 연동을 담당하는 LangChain.
 - 질문 처리 흐름을 상태 그래프로 관리하는 LangGraph.
-- 로컬 영구 벡터 저장소인 Chroma.
+- 로컬 영구 벡터 저장소인 FAISS와, 같은 청크로 만든 BM25.
 - 임베딩과 답변 생성을 위한 OpenAI API.
 - 설정된 경우 실행 추적을 남기는 LangSmith.
 
@@ -31,11 +31,11 @@ flowchart LR
     Graph --> LLM[OpenAI Chat Model]
     Graph --> Trace[LangSmith Tracing]
 
-    Indexing[Indexing Command] --> Loader[PDF Loader]
-    Loader --> Splitter[Text Splitter]
+    Indexing[Indexing Command] --> Loader[OCR JSONL Loader]
+    Loader --> Splitter[Semantic Chunker]
     Splitter --> Embeddings[OpenAI Embeddings]
-    Embeddings --> Chroma
-    PDF[Data/청년수당 참여자 안내책자.pdf] --> Loader
+    Embeddings --> FAISSStore[FAISS]
+    OCR[Data/upstage_youth_allowance_parse.jsonl] --> Loader
 
     Graph -. future disabled node .-> OfficialSearch[Official Source Search Extension]
 ```
@@ -74,14 +74,15 @@ Indexing은 RAG 사전 준비 단계다. 이 프로젝트에서는 RAG에서 흔
 
 ```mermaid
 flowchart TD
-    PDF[PDF 안내책자] --> Extract[페이지별 텍스트 추출]
-    Extract --> Chunk[청크 분할]
-    Chunk --> Metadata[메타데이터 부착: source, page, chunk_id]
+    PDF[PDF 안내책자] --> OCR[Upstage OCR, 사전 실행]
+    OCR --> Extract[페이지별 OCR JSONL 로드]
+    Extract --> Chunk[페이지별 시맨틱 청킹]
+    Chunk --> Metadata[메타데이터 부착: source, page, chunk_id=sem_NNNN]
     Metadata --> Embed[OpenAI Embeddings 생성]
-    Embed --> Store[Chroma에 영구 저장]
+    Embed --> Store[FAISS 저장 + manifest.json]
 ```
 
-채팅을 안정적으로 사용하려면 먼저 indexing 명령을 실행해야 한다. Chroma 인덱스가 없으면 백엔드는 `index_missing` 오류를 명확히 반환한다.
+채팅을 안정적으로 사용하려면 먼저 indexing 명령을 실행해야 한다. FAISS 인덱스가 없으면 백엔드는 `index_missing` 오류를 명확히 반환한다.
 
 Indexing 명령은 성공 시 다음 검증 정보를 출력한다.
 
@@ -109,7 +110,7 @@ stateDiagram-v2
 
 ### 노드 책임
 
-- `retrieve_pdf`: Chroma에서 질문과 관련 있는 안내책자 청크를 검색한다.
+- `retrieve_pdf`: FAISS와 BM25 결과를 RRF로 합쳐 질문과 관련 있는 안내책자 청크를 검색한다.
 - `assess_evidence`: 검색 score와 LLM grader를 함께 사용해 검색된 청크만으로 안전하게 답변할 수 있는지 판단한다.
 - `generate_answer`: 검색된 PDF 근거만 사용해 한국어 답변을 생성한다.
 - `fallback_no_answer`: 안내책자에서 답을 확인할 수 없을 때 안전한 fallback을 반환한다.
@@ -143,16 +144,15 @@ LLM evidence grader는 다음 구조를 반환한다.
 
 ### `indexing`
 
-- 안내책자 PDF를 읽는다.
-- 페이지 번호를 유지하며 텍스트를 추출한다.
-- 텍스트를 검색 가능한 청크로 나눈다.
+- 안내책자 OCR 결과(JSONL)를 읽는다. PDF에 텍스트 레이어가 없어 OCR은 사전에 실행한다.
+- 페이지 번호를 유지하며 페이지별로 시맨틱 청킹한다.
 - 임베딩을 생성한다.
-- 문서, 벡터, 메타데이터를 Chroma에 저장한다.
+- 문서, 벡터, 메타데이터를 FAISS에 저장하고 재현용 `manifest.json`을 남긴다.
 - 추출 품질 지표를 출력하고 비정상적인 추출 결과를 실패로 처리한다.
 
 ### `rag`
 
-- Chroma retriever를 생성한다.
+- FAISS + BM25 하이브리드 retriever를 생성한다.
 - 답변 프롬프트를 정의한다.
 - 검색된 문서를 프론트엔드에 표시 가능한 source 객체로 정규화한다.
 - top-k 같은 RAG 설정을 관리한다.
@@ -256,7 +256,7 @@ data: {"answer":"안내책자 근거로 확인한 답변입니다.","sources":[]
 권장 HTTP 매핑:
 
 - `400 invalid_request`: 요청 형식이 잘못됨.
-- `409 index_missing`: Chroma 인덱스가 없음.
+- `409 index_missing`: FAISS 인덱스가 없음.
 - `500 generation_error`: OpenAI 또는 런타임 오류.
 - `500 indexing_error`: indexing 실행 실패.
 
@@ -270,17 +270,17 @@ backend/
     indexing/
     rag/
     core/
-  storage/
-    chroma/
+  faiss_rag_final/
 frontend/
 Data/
-  청년수당 참여자 안내책자.pdf
+  youth_allowance.pdf
+  upstage_youth_allowance_parse.jsonl
 docs/
   PRD.md
   architecture.md
 ```
 
-`backend/storage/chroma`는 생성 가능한 로컬 데이터로 취급한다.
+`backend/faiss_rag_final`은 indexing 명령으로 다시 만들 수 있는 로컬 데이터로 취급한다.
 
 ## 10. 설정
 
@@ -304,7 +304,7 @@ docs/
 - JSON 파싱 실패, schema/version 불일치, 예상하지 못한 타입은 cache miss다.
 - Redis get/set/delete 장애는 검색 요청으로 전파하지 않는다.
 
-### 10.2 FAISS 신뢰 경계와 PDF fallback cache
+### 10.2 FAISS 신뢰 경계
 
 설치된 LangChain FAISS 포맷은 벡터 데이터 `index.faiss`와 docstore 및
 index-to-document ID 매핑 `index.pkl`을 함께 로드한다. `FAISS.load_local`의
@@ -320,11 +320,8 @@ index-to-document ID 매핑 `index.pkl`을 함께 로드한다. `FAISS.load_loca
 - 경로는 배포 설정으로만 정하며 요청 파라미터, 업로드 파일, 외부 URL에서 받지 않는다.
 - 신뢰할 수 있는 빌드 과정에서 직접 생성한 인덱스만 배치한다. 다운로드했거나 출처와
   무결성을 검증하지 않은 인덱스는 로드하지 않는다.
-- 검증 실패나 인덱스 손상은 PDF 텍스트 기반 BM25-only 경로로 격리한다.
-
-BM25 fallback corpus는 프로세스별 LRU cache에 최대 4개 보관한다. cache key는
-정규화된 PDF 경로, `st_mtime_ns`, 파일 크기이며 파일 상태가 바뀌면 재파싱한다.
-서버 재시작 시 cache는 비워지고 디스크 산출물은 만들지 않는다.
+- 검증 실패나 인덱스 손상은 로드하지 않고 검색 불가 오류로 처리한다. PDF에
+  텍스트 레이어가 없어 PDF 기반 BM25 fallback은 두지 않는다.
 
 ### 10.3 운영 개인정보 로그 체크리스트
 
@@ -345,7 +342,7 @@ BM25 fallback corpus는 프로세스별 LRU cache에 최대 4개 보관한다. c
 - PDF 파일 없음.
 - PDF 텍스트 추출 실패.
 - PDF 텍스트 추출 품질 부족.
-- Chroma 인덱스 없음.
+- FAISS 인덱스 없음.
 - OpenAI API 실패.
 - rate limit 또는 네트워크 실패.
 - 프론트엔드에서 백엔드 연결 실패.
@@ -357,7 +354,7 @@ BM25 fallback corpus는 프로세스별 LRU cache에 최대 4개 보관한다. c
 
 백엔드 테스트는 다음을 확인한다.
 
-- indexing이 Chroma 데이터를 생성한다.
+- indexing이 FAISS 인덱스와 manifest를 생성한다.
 - indexing이 페이지 수, 빈 페이지 수, 추출 문자 수, 청크 수를 출력한다.
 - 텍스트 추출 결과가 비정상적으로 작으면 indexing이 실패한다.
 - 청크 메타데이터에 `source`, `page`, `chunk_id`가 포함된다.
