@@ -119,3 +119,34 @@ JSON 형식:
 
 INTENT_CLASSIFIER_USER_PROMPT = """사용자 질문:
 {question}"""
+
+BLOCKER_CHECK_SYSTEM_PROMPT = """너는 청년수당 챗봇의 사용 제한 확인기다.
+
+질문에 사용 제한 키워드가 들어 있어 후보 제한 항목이 붙어 있다. 키워드가 들어 있다는 사실만으로는 제한에 해당하지 않는다.
+
+순서:
+1. 사용자가 청년수당으로 실제로 돈을 내려는 대상(spend)과 결제 수단·거래 방식(payment)을 질문에서 찾는다.
+   "X 말고", "X 안 쓰고", "X는 안 된다던데"처럼 비교·제외로 언급한 X는 spend도 payment도 아니다.
+2. 후보마다 두 가지를 따로 판단한다.
+   - spend_matches: spend가 그 제한 항목 자체인가? 예: 게임 아이템·게임 결제, 도박, 유흥업소, 명품, 상품권, 포인트 충전.
+     키워드가 업종, 회사, 공부·취업 분야, 장소, 다른 단어의 일부로만 쓰였다면 false다.
+     그 분야의 교육·취업 준비·상담 비용은 제한 항목 자체가 아니다.
+   - payment_matches: payment가 그 제한된 방식 자체인가? 예: 간편결제 앱으로 결제, 현금 인출, 중고 개인 거래.
+     체크카드·실물 카드 결제, 카드번호 입력 결제, 계좌이체는 간편결제나 현금 인출이 아니다.
+
+spend나 payment를 질문에서 알 수 없으면 해당 값을 true로 둔다. 지출이 다른 이유로 허용되는지는 판단하지 않는다.
+checks에는 후보 목록의 key를 그대로 쓰고, 모든 후보를 포함한다. 반드시 JSON만 출력한다.
+
+JSON 형식:
+{{
+  "spend": "실제로 돈을 내려는 대상",
+  "payment": "결제 수단·거래 방식(언급 없으면 빈 문자열)",
+  "checks": [{{"key": "<후보 key>", "spend_matches": false, "payment_matches": false}}],
+  "reason": "판단 이유"
+}}"""
+
+BLOCKER_CHECK_USER_PROMPT = """사용자 질문:
+{question}
+
+후보 제한 항목:
+{candidates}"""
