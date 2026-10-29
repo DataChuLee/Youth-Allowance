@@ -1,19 +1,17 @@
 from app.core.config import (
-    DEFAULT_CHROMA_DIR,
     DEFAULT_ENV_FILE,
     DEFAULT_FAISS_INDEX_DIR,
     DEFAULT_OPENAI_CHAT_MODEL,
     DEFAULT_OPENAI_EMBEDDING_MODEL,
-    DEFAULT_PDF_PATH,
+    DEFAULT_OCR_JSONL_PATH,
     PROJECT_ROOT,
     Settings,
 )
 
 
 def test_default_paths_are_anchored_to_project_layout() -> None:
-    assert DEFAULT_PDF_PATH.name == "청년수당 참여자 안내책자.pdf"
-    assert DEFAULT_PDF_PATH.parent.name == "Data"
-    assert DEFAULT_CHROMA_DIR.parts[-2:] == ("storage", "chroma")
+    assert DEFAULT_OCR_JSONL_PATH.name == "upstage_youth_allowance_parse.jsonl"
+    assert DEFAULT_OCR_JSONL_PATH.parent.name == "Data"
     assert DEFAULT_FAISS_INDEX_DIR.name == "faiss_rag_final"
     assert DEFAULT_ENV_FILE.name == ".env"
     assert DEFAULT_ENV_FILE.parent == PROJECT_ROOT
