@@ -74,7 +74,7 @@ def disable_query_cache() -> None:
     cache._instance = cache.DisabledQueryCache()
 
 
-def run_meta(stage: str, **extra: Any) -> dict[str, Any]:
+def run_meta(stage: str, cases_path: Path = CASES_PATH, **extra: Any) -> dict[str, Any]:
     from app.core.config import get_settings
 
     settings = get_settings()
@@ -82,7 +82,7 @@ def run_meta(stage: str, **extra: Any) -> dict[str, Any]:
         "stage": stage,
         "started_at": datetime.now(timezone.utc).isoformat(),
         "git_commit": git_commit(),
-        "cases": CASES_PATH.name,
+        "cases": cases_path.name,
         "app_env": settings.app_env,
         "chat_model": settings.openai_chat_model,
         "embedding_model": settings.openai_embedding_model,
@@ -104,13 +104,13 @@ def read_jsonl(path: Path) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
     return rows[0]["_meta"], {row["id"]: row for row in rows[1:]}
 
 
-def stage_retrieval(tag: str) -> None:
+def stage_retrieval(tag: str, cases_path: Path = CASES_PATH) -> None:
     from app.rag.retrieval import retrieve_pdf_documents_with_ensemble
 
     manifest = load_index_manifest()
     disable_query_cache()
     records = []
-    for case in load_eval_cases(CASES_PATH):
+    for case in load_eval_cases(cases_path):
         started = time.perf_counter()
         documents = retrieve_pdf_documents_with_ensemble(case.question)
         records.append({
@@ -120,16 +120,16 @@ def stage_retrieval(tag: str) -> None:
             "elapsed_ms": round((time.perf_counter() - started) * 1000, 1),
         })
         print(f"retrieval {case.case_id}", flush=True)
-    write_jsonl(result_path("retrieval.jsonl", tag), run_meta("retrieval", index=manifest), records)
+    write_jsonl(result_path("retrieval.jsonl", tag), run_meta("retrieval", cases_path, index=manifest), records)
 
 
-def stage_answer(tag: str) -> None:
+def stage_answer(tag: str, cases_path: Path = CASES_PATH) -> None:
     from app.graph.workflow import run_chat_graph
 
     manifest = load_index_manifest()
     disable_query_cache()
     records = []
-    for case in load_eval_cases(CASES_PATH):
+    for case in load_eval_cases(cases_path):
         started = time.perf_counter()
         try:
             response = run_chat_graph(case.question)
@@ -146,10 +146,10 @@ def stage_answer(tag: str) -> None:
         record["elapsed_ms"] = round((time.perf_counter() - started) * 1000, 1)
         records.append(record)
         print(f"answer {case.case_id} {record['status']}", flush=True)
-    write_jsonl(result_path("answers.jsonl", tag), run_meta("answer", index=manifest), records)
+    write_jsonl(result_path("answers.jsonl", tag), run_meta("answer", cases_path, index=manifest), records)
 
 
-def stage_judge(tag: str) -> None:
+def stage_judge(tag: str, cases_path: Path = CASES_PATH) -> None:
     from openai import OpenAI
 
     from app.core.config import get_settings
@@ -157,7 +157,7 @@ def stage_judge(tag: str) -> None:
     client = OpenAI(api_key=get_settings().openai_api_key)
     _, answers = read_jsonl(result_path("answers.jsonl", tag))
     records = []
-    for case in load_eval_cases(CASES_PATH):
+    for case in load_eval_cases(cases_path):
         response = client.chat.completions.create(
             model=JUDGE_MODEL,
             temperature=0,
@@ -167,13 +167,13 @@ def stage_judge(tag: str) -> None:
         raw = response.choices[0].message.content or ""
         records.append({"id": case.case_id, "label": parse_judge_label(raw), "raw": raw})
         print(f"judge {case.case_id} {records[-1]['label']}", flush=True)
-    write_jsonl(result_path("judge.jsonl", tag), run_meta("judge", judge_model=JUDGE_MODEL), records)
+    write_jsonl(result_path("judge.jsonl", tag), run_meta("judge", cases_path, judge_model=JUDGE_MODEL), records)
 
 
-def stage_sample(tag: str) -> None:
+def stage_sample(tag: str, cases_path: Path = CASES_PATH) -> None:
     """판정자 검증용: 범주별로 고르게 30개를 뽑아 사람이 라벨을 다는 CSV를 만든다(판정 결과는 숨김)."""
     _, answers = read_jsonl(result_path("answers.jsonl", tag))
-    cases = load_eval_cases(CASES_PATH)
+    cases = load_eval_cases(cases_path)
     rng = random.Random(20261029)
     by_category: dict[str, list] = {}
     for case in cases:
@@ -216,8 +216,8 @@ def load_source_texts() -> dict[str, str]:
     return load_chunk_texts(get_settings())
 
 
-def stage_score(tag: str) -> None:
-    cases = load_eval_cases(CASES_PATH)
+def stage_score(tag: str, cases_path: Path = CASES_PATH) -> None:
+    cases = load_eval_cases(cases_path)
     retrieval_meta, retrieval = read_jsonl(result_path("retrieval.jsonl", tag))
     answer_meta, answers = read_jsonl(result_path("answers.jsonl", tag))
     judge_meta, judged = read_jsonl(result_path("judge.jsonl", tag))
@@ -273,11 +273,12 @@ def main() -> None:
     parser.add_argument("stage", choices=list(STAGES))
     parser.add_argument("--tag", default="baseline", help="결과 파일 구분용 이름")
     parser.add_argument("--execute", action="store_true", help="외부 API 호출 단계를 실제로 실행")
+    parser.add_argument("--cases", type=Path, default=CASES_PATH, help="문항 파일(기본: 시험셋)")
     args = parser.parse_args()
     if args.stage in API_STAGES and not args.execute:
         print(f"{args.stage} 단계는 API를 호출합니다. 실행하려면 --execute를 붙이세요.")
         return
-    STAGES[args.stage](args.tag)
+    STAGES[args.stage](args.tag, args.cases)
 
 
 if __name__ == "__main__":

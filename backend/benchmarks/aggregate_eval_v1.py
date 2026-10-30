@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 from statistics import mean
 from typing import Any
 
@@ -49,13 +50,14 @@ def aggregate_runs(
 def main() -> None:
     parser = argparse.ArgumentParser(description="평가 v1 반복 실행 집계")
     parser.add_argument("conditions", nargs="+", help="조건=태그1,태그2,...")
+    parser.add_argument("--cases", type=Path, default=CASES_PATH, help="문항 파일(기본: 시험셋)")
     args = parser.parse_args()
     summary = {}
     for item in args.conditions:
         name, tags = item.split("=", 1)
         tag_list = tags.split(",")
         runs = [load_run(tag) for tag in tag_list]
-        summary[name] = {"tags": tag_list, **aggregate_runs(load_eval_cases(CASES_PATH), runs)}
+        summary[name] = {"tags": tag_list, **aggregate_runs(load_eval_cases(args.cases), runs)}
     path = result_path("aggregate.json", "_".join(summary))
     path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(summary, ensure_ascii=False, indent=2))
