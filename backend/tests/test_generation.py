@@ -26,6 +26,7 @@ def test_generate_pdf_answer_invokes_chat_model_with_pdf_context(monkeypatch) ->
     settings = SimpleNamespace(
         openai_api_key="test-key",
         openai_chat_model="test-chat-model",
+        openai_answer_model=None,
     )
 
     class FakeChatOpenAI:
@@ -60,6 +61,7 @@ def test_stream_pdf_answer_yields_chat_model_chunks(monkeypatch) -> None:
     settings = SimpleNamespace(
         openai_api_key="test-key",
         openai_chat_model="test-chat-model",
+        openai_answer_model=None,
     )
 
     class FakeChatOpenAI:
@@ -94,6 +96,7 @@ def test_generate_policy_context_answer_injects_pdf_context(monkeypatch) -> None
     settings = SimpleNamespace(
         openai_api_key="test-key",
         openai_chat_model="test-chat-model",
+        openai_answer_model=None,
     )
 
     class FakeChatOpenAI:
@@ -126,6 +129,7 @@ def test_food_delivery_context_adds_guidance(monkeypatch) -> None:
     settings = SimpleNamespace(
         openai_api_key="test-key",
         openai_chat_model="test-chat-model",
+        openai_answer_model=None,
     )
 
     class FakeChatOpenAI:
@@ -151,3 +155,17 @@ def test_food_delivery_context_adds_guidance(monkeypatch) -> None:
     assert "간편결제는 불가" in prompt_text
     assert "클린카드 사용 불가 업종 제한" not in prompt_text
     assert answer == "배민은 조건부 가능"
+
+
+def test_answer_model_override_drops_temperature_for_gpt5(monkeypatch) -> None:
+    captured = {}
+    monkeypatch.setattr(generation, "ChatOpenAI", lambda **kwargs: captured.update(kwargs))
+    settings = SimpleNamespace(
+        openai_api_key="test-key",
+        openai_chat_model="gpt-4o-mini",
+        openai_answer_model="gpt-5.4-mini-2026-03-17",
+    )
+
+    generation.create_answer_llm(settings)
+
+    assert captured == {"api_key": "test-key", "model": "gpt-5.4-mini-2026-03-17"}
