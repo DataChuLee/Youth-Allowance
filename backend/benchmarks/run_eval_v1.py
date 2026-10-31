@@ -14,7 +14,7 @@ import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from benchmarks.eval_v1 import (
     build_judge_messages,
@@ -124,16 +124,49 @@ def stage_retrieval(tag: str, cases_path: Path = CASES_PATH) -> None:
     write_jsonl(result_path("retrieval.jsonl", tag), run_meta("retrieval", cases_path, index=manifest), records)
 
 
-def stage_answer(tag: str, cases_path: Path = CASES_PATH) -> None:
+def full_context_chat() -> Callable[[str], Any]:
+    """진단용 답변 경로: 의도 분류는 그대로 두고, 검색·키워드 차단·근거 평가 대신 책자 전체를 넣는다.
+
+    답변 프롬프트와 모델은 서비스 경로(generate_policy_context_answer)와 같다. 그래서 그래프 결과와의
+    차이는 "검색과 관문이 근거를 걸렀는가"에서 온다.
+    """
+    from types import SimpleNamespace
+
+    from app.core.config import get_settings
+    from app.indexing.index_pdf import load_ocr_pages
+    from app.rag.generation import build_general_answer, generate_policy_context_answer
+    from app.rag.intent import create_intent_classifier
+
+    settings = get_settings()
+    pages = load_ocr_pages(settings.ocr_jsonl_path)
+    for page in pages:
+        page.metadata["chunk_id"] = f"page_{page.metadata['page']}"
+    classify = create_intent_classifier(settings)
+
+    def chat(question: str) -> Any:
+        try:
+            intent = classify(question).intent
+        except Exception:
+            intent = "rag"  # 그래프의 classify_intent_node와 같은 실패 처리
+        if intent == "general_answer":
+            return SimpleNamespace(status="general_answer", answer=build_general_answer(question), sources=[])
+        answer = generate_policy_context_answer(question, pages, settings)
+        return SimpleNamespace(status="answered_from_pdf", answer=answer, sources=[])
+
+    return chat
+
+
+def stage_answer(tag: str, cases_path: Path = CASES_PATH, full_context: bool = False) -> None:
     from app.graph.workflow import run_chat_graph
 
+    chat = full_context_chat() if full_context else run_chat_graph
     manifest = load_index_manifest()
     disable_query_cache()
     records = []
     for case in load_eval_cases(cases_path):
         started = time.perf_counter()
         try:
-            response = run_chat_graph(case.question)
+            response = chat(case.question)
             record = {
                 "id": case.case_id,
                 "status": response.status,
@@ -147,7 +180,8 @@ def stage_answer(tag: str, cases_path: Path = CASES_PATH) -> None:
         record["elapsed_ms"] = round((time.perf_counter() - started) * 1000, 1)
         records.append(record)
         print(f"answer {case.case_id} {record['status']}", flush=True)
-    write_jsonl(result_path("answers.jsonl", tag), run_meta("answer", cases_path, index=manifest), records)
+    meta = run_meta("answer", cases_path, index=manifest, answer_mode="full_context" if full_context else "graph")
+    write_jsonl(result_path("answers.jsonl", tag), meta, records)
 
 
 def stage_judge(tag: str, cases_path: Path = CASES_PATH) -> None:
@@ -275,9 +309,13 @@ def main() -> None:
     parser.add_argument("--tag", default="baseline", help="결과 파일 구분용 이름")
     parser.add_argument("--execute", action="store_true", help="외부 API 호출 단계를 실제로 실행")
     parser.add_argument("--cases", type=Path, default=CASES_PATH, help="문항 파일(기본: 시험셋)")
+    parser.add_argument("--full-context", action="store_true", help="answer 단계: 검색 대신 책자 전체를 넣는 진단 경로")
     args = parser.parse_args()
     if args.stage in API_STAGES and not args.execute:
         print(f"{args.stage} 단계는 API를 호출합니다. 실행하려면 --execute를 붙이세요.")
+        return
+    if args.stage == "answer":
+        stage_answer(args.tag, args.cases, args.full_context)
         return
     STAGES[args.stage](args.tag, args.cases)
 
