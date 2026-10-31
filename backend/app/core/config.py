@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     openai_embedding_model: str = Field(
         default=DEFAULT_OPENAI_EMBEDDING_MODEL, alias="OPENAI_EMBEDDING_MODEL"
     )
+    # 최종 답변 모델만 바꾸는 비교 실험용. 비우면 openai_chat_model을 쓴다.
+    openai_answer_model: str | None = Field(default=None, alias="OPENAI_ANSWER_MODEL")
     # 키워드 차단 확인은 gpt-4o-mini가 개발셋 42문항 중 6개를 틀려 더 강한 모델을 따로 쓴다.
     openai_blocker_check_model: str = Field(
         default=DEFAULT_OPENAI_BLOCKER_CHECK_MODEL, alias="OPENAI_BLOCKER_CHECK_MODEL"
