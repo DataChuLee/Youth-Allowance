@@ -34,10 +34,11 @@
      - 코인은 "가상자산 투자 목적 매수"로 바꿨다.
      - 이월과 개인 돈 입금은 `account_actions`로 분리했다. 카드 결제 판정은 범주가 맞지 않아서다.
    - `health_insurance`의 계좌이체 판정은 unclear로 유지한다. 담당 기관 확인이 필요하다.
-2. [ ] **핸들러**
-   - `resolve_spending(item, payment)`
-   - `check_eligibility(...)`
-   - 단위 테스트
+2. [x] **핸들러** (`handlers.py`, `tests/test_rule_handlers.py`)
+   - `resolve_spending(rule_id, payment)`: 결제 방식 금지 → 사용 불가 업종 → 계좌 이용 → 항목×경로(카드/이체/보전) 순서로 판정한다.
+     - 결제수단을 모르면 가장 유리한 경로를 쓴다. 예: 해외 AI 구독은 보전 경로로 조건부.
+   - `check_eligibility(section, rule_id, exception_id, age)`: 제외 사유의 예외에 해당해도 "가능"이 아니라 조건부다. 다른 요건이 남아 있기 때문이다.
+   - 요건 내용만 묻는 질문과 미확인 별칭은 unclear로 처리해 RAG로 넘긴다.
    - 검토 의견(O 판정이지만 핸들러에서 지킬 것):
      - 대학원생은 재학·휴학 중일 때만 제외 대상이다.
      - 창업에는 취업의 근로시간·근로기간 조건을 적용하지 않는다.
