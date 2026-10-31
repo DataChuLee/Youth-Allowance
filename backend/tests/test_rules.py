@@ -38,7 +38,7 @@ def test_rule_ids_are_unique_within_each_section(name: str) -> None:
 
 def test_spending_rules_use_known_verdicts_and_cite_sources() -> None:
     rules = load_rules("spending")
-    for entry in [*rules["payment_methods"], *rules["items"]]:
+    for entry in [*rules["payment_methods"], *rules["items"], *rules["account_actions"]]:
         assert entry["names"] and entry["sources"], entry["id"]
         for key in ("verdict", "transfer", "reimbursement"):
             assert entry.get(key, "prohibited") in VERDICTS, (entry["id"], key)
