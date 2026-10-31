@@ -1,0 +1,381 @@
+# 청년수당 지출 판정 규칙 (2026 참여자 안내책자 8·12~18·31쪽)
+#
+# 판정 값: allowed(가능) | conditional(조건부 가능) | prohibited(불가) | unclear(책자로 판단 불가 → RAG로 넘김)
+# - verdict: 청년수당 전용 체크카드로 결제할 때의 판정 (결제수단과 무관한 행위는 그 행위의 판정)
+# - transfer: 계좌이체(현금 사용)할 때의 판정. 적지 않으면 prohibited
+#   (13쪽: 주거비·생활공과금·교육비 3개 항목에서 증빙을 낸 경우에만 인정)
+# - reimbursement: 다른 카드로 먼저 결제하고 청년수당으로 보전할 때의 판정. 적지 않으면 prohibited
+#   (18쪽: 해외 생성형 AI 구독료 외에는 어떤 경우에도 보전 불가)
+# - names: 질문 표현과 규칙을 잇는 이름. 책자에 없는 별칭은 aliases에 따로 둔다(사람 검토 대상)
+# - sources.quote: 해당 쪽 OCR 원문에 그대로 있어야 한다(공백·표 구분자 무시). tests/test_rules.py가 검사한다.
+
+defaults:
+  transfer: prohibited
+  reimbursement: prohibited
+  sources:
+    - {page: 13, quote: "현금 사용(계좌이체)은 주거비, 생활공과금, 교육비 등 3개 항목에서 증빙서류를 제출한 경우에만 인정됩니다."}
+    - {page: 18, quote: "'해외 생성형 AI 프로그램 구독료'가 아닌 다른 모든 항목에 대해서는 어떤 경우에도 보전이 불가합니다."}
+
+# 결제·이용 방식 자체가 막히는 경우. 항목 판정보다 먼저 적용한다.
+payment_methods:
+  - id: easy_pay
+    names: [간편 결제, 카카오페이, 네이버페이]
+    aliases: [토스페이, 페이코, 삼성페이, 애플페이]
+    verdict: prohibited
+    sources:
+      - {page: 12, quote: "단 카카오페이, 네이버페이 등 간편 결제 불가"}
+  - id: cash_withdrawal
+    names: [현금인출]
+    aliases: [ATM 출금, 현금 찾기]
+    verdict: prohibited
+    sources:
+      - {page: 13, quote: "현금 사용이란 계좌이체를 말하며, 현금인출은 불가합니다."}
+  - id: own_account_transfer
+    names: [개인이 소유한 다른 계좌로 이체]
+    aliases: [내 다른 통장으로 이체, 본인 계좌로 옮기기]
+    verdict: prohibited
+    sources:
+      - {page: 8, quote: "개인이 소유한 다른 계좌로 이체하여 사용 불가"}
+      - {page: 18, quote: "청년수당 지원금을 참여자 본인의 다른 계좌로 이체해서 사용할 수 없습니다."}
+  - id: overseas_card_payment
+    names: [해외결제]
+    aliases: [해외 직구 결제, 해외 사이트 결제]
+    verdict: prohibited
+    sources:
+      - {page: 18, quote: "청년수당 카드로는 해외결제가 불가능합니다."}
+
+items:
+  # ---- 사용 가능 항목 (12쪽 사용 예) ----
+  - id: rent
+    names: [월세]
+    group: 주거비
+    verdict: allowed
+    transfer: conditional
+    evidence: [임대차계약서, 이체확인증, 주민등록등본(해당자만)]
+    sources:
+      - {page: 12, quote: "월세, 관리비, 공과금(세금 및 연금 제외), 주거 관련 대출 원금 및 이자 등"}
+      - {page: 13, quote: "월세 ① 임대차계약서 ② 이체확인증 ③주민등록등본(해당자만)"}
+  - id: maintenance_fee
+    names: [관리비]
+    group: 주거비
+    verdict: allowed
+    transfer: conditional
+    evidence: [고지서 또는 관리비 조항이 있는 임대차계약서, 이체확인증, 주민등록등본(해당자만)]
+    sources:
+      - {page: 12, quote: "월세, 관리비, 공과금(세금 및 연금 제외)"}
+      - {page: 13, quote: "관리비 ①고지서(임대차계약서에 관리비 조항이 있을 경우 임대차계약서 제출 가능) ② 이체확인증"}
+  - id: utilities
+    names: [공과금, 전기요금, 수도요금, 가스요금]
+    group: 주거비
+    verdict: allowed
+    transfer: conditional
+    evidence: [고지서, 이체확인증]
+    sources:
+      - {page: 12, quote: "공과금(세금 및 연금 제외)"}
+      - {page: 13, quote: "공과금 ①고지서 ② 이체확인증"}
+      - {page: 14, quote: "전기 종이/이메일/모바일(문자)/카카오톡 청구서"}
+  - id: housing_loan
+    names: [주거 관련 대출 원금 및 이자, 전세자금대출]
+    group: 주거비
+    verdict: allowed
+    condition: 본인 명의의 주거 관련 대출만 인정
+    transfer: conditional
+    evidence: [대출거래약정서, 이체확인증]
+    sources:
+      - {page: 12, quote: "주거 관련 대출 원금 및 이자 등"}
+      - {page: 13, quote: "주거 관련 대출 (원금 및 이자) ①대출거래약정서 ② 이체확인증"}
+      - {page: 14, quote: "본인 명의가 아닌 대출은 불인정"}
+  - id: food
+    names: [식비]
+    group: 생활비
+    verdict: allowed
+    sources:
+      - {page: 12, quote: "식비, 통신비(소액결제 제외), 교통비 (해외 항공권 제외), 건강보험료 등"}
+  - id: telecom
+    names: [통신비, 휴대폰 요금]
+    group: 생활비
+    verdict: allowed
+    condition: 소액결제·결제대행요금은 제외
+    transfer: conditional
+    evidence: [상세 고지서, 이체확인증]
+    sources:
+      - {page: 12, quote: "통신비(소액결제 제외)"}
+      - {page: 13, quote: "통신비 ①고지서(상세) ② 이체확인증"}
+  - id: transport
+    names: [교통비]
+    group: 생활비
+    verdict: allowed
+    sources:
+      - {page: 12, quote: "교통비 (해외 항공권 제외)"}
+  - id: health_insurance
+    names: [건강보험료, 국민건강보험료]
+    group: 생활비
+    verdict: allowed
+    transfer: unclear
+    note: 14쪽에 국민건강보험 고지서 기준은 있으나 13쪽 계좌이체 가능 항목 표에는 없다. 사람 확인 필요.
+    sources:
+      - {page: 12, quote: "건강보험료 등"}
+      - {page: 14, quote: "국민건강보험이 아닌 다른 보험은 불인정"}
+  - id: academy
+    names: [학원비, 인터넷 강의]
+    group: 교육비·구직활동비
+    verdict: allowed
+    sources:
+      - {page: 12, quote: "학원비, 도서 구매비, 시험 응시료, 면접 복장 구매 및 대여비, 학자금대출 원금 및 이자, 생성형 AI 구독료 등"}
+  - id: books
+    names: [도서 구매비, 책]
+    group: 교육비·구직활동비
+    verdict: allowed
+    sources:
+      - {page: 12, quote: "도서 구매비"}
+  - id: exam_fee
+    names: [시험 응시료, 자격증 시험]
+    group: 교육비·구직활동비
+    verdict: allowed
+    transfer: conditional
+    evidence: [수험표 또는 접수확인서, 이체확인증]
+    sources:
+      - {page: 12, quote: "시험 응시료"}
+      - {page: 13, quote: "시험 응시료 ①수험표 또는 접수확인서 ② 이체확인증"}
+  - id: interview_clothes
+    names: [면접 복장 구매 및 대여비, 정장]
+    group: 교육비·구직활동비
+    verdict: allowed
+    sources:
+      - {page: 12, quote: "면접 복장 구매 및 대여비"}
+  - id: student_loan
+    names: [학자금대출 원금 및 이자]
+    group: 교육비·구직활동비
+    verdict: allowed
+    condition: 본인 명의의 학자금대출만 인정
+    transfer: conditional
+    evidence: [대출거래약정서(한국장학재단 부채확인서·금융거래확인서), 이체확인증]
+    sources:
+      - {page: 12, quote: "학자금대출 원금 및 이자"}
+      - {page: 13, quote: "학자금 대출 (원금 및 이자) ①대출거래약정서 ② 이체확인증"}
+      - {page: 16, quote: "인정 서류 : 한국장학재단 발급 '부채확인서', '금융거래확인서'"}
+  - id: domestic_ai_subscription
+    names: [국내 생성형 AI 프로그램 구독료]
+    group: 교육비·구직활동비
+    verdict: allowed
+    sources:
+      - {page: 12, quote: "생성형 AI 구독료 등"}
+      - {page: 18, quote: "국내 생성형 AI 프로그램 구독료를 청년수당으로 지출하고자 한다면 반드시 청년수당 전용 카드로 결제하세요."}
+  - id: overseas_ai_subscription
+    names: [해외 생성형 AI 프로그램 구독료, 챗GPT]
+    group: 교육비·구직활동비
+    verdict: prohibited  # 청년수당 카드는 해외결제가 막혀 있다
+    reimbursement: conditional
+    evidence: [거래명세서 또는 영수증, 이체확인증(청년수당 계좌 · 본인 계좌)]
+    sources:
+      - {page: 18, quote: "해외 생성형 AI 프로그램(챗GPT 등)을 구독하고자 하는 경우 개인이 보유한 다른 카드로 결제하고 실 지출 금액만큼 청년수당으로 보전할 수 있습니다."}
+      - {page: 13, quote: "해외 생성형 AI 프로그램 구독료 ①거래명세서 또는 영수증 ② 이체확인증 (청년수당 계좌 · 본인 계좌)"}
+  - id: culture
+    names: [문화 관람비, 영화, 공연, 전시]
+    group: 기타
+    verdict: allowed
+    sources:
+      - {page: 12, quote: "문화 관람비, 취미·여가 활동비 등"}
+  - id: hobby
+    names: [취미·여가 활동비]
+    group: 기타
+    verdict: allowed
+    sources:
+      - {page: 12, quote: "취미·여가 활동비"}
+  - id: study_devices
+    names: [태블릿 PC, 노트북, 의자]
+    group: 기타
+    verdict: conditional
+    condition: 인터넷강의 청취, 공부, 면접 준비처럼 사업 취지에 맞으면 가능. 고가의 사치품은 제한
+    sources:
+      - {page: 31, quote: "태블릿 PC, 노트북, 의자 등은 인터넷강의 청취, 공부, 면접 준비와 같이 청년수당 사업 취지에 부합하는 경우에 구입 가능하나 사회 정서에 반하는 고가의 사치품은 구입 제한됩니다."}
+
+  # ---- 사용 가능 항목의 예외 (이름이 비슷해서 헷갈리는 것) ----
+  - id: micropayment
+    names: [소액결제, 결제대행요금]
+    group: 생활비
+    verdict: prohibited
+    sources:
+      - {page: 12, quote: "통신비(소액결제 제외)"}
+      - {page: 17, quote: "결제대행요금(지원금으로 사용할 수 없음)"}
+  - id: overseas_flight
+    names: [해외 항공권]
+    group: 생활비
+    verdict: prohibited
+    sources:
+      - {page: 12, quote: "교통비 (해외 항공권 제외)"}
+  - id: tax
+    names: [세금 납부]
+    aliases: [자동차세, 주민세, 재산세]
+    group: 자산 운영·축적 및 투자
+    verdict: prohibited
+    sources:
+      - {page: 12, quote: "공과금(세금 및 연금 제외)"}
+      - {page: 12, quote: "예금, 적금, 세금 납부, 보험료 납부, 국민연금 납부,"}
+
+  # ---- 자산 운영·축적 및 투자 (12쪽, 8쪽 유의사항 5) ----
+  - id: savings
+    names: [예금, 적금]
+    group: 자산 운영·축적 및 투자
+    verdict: prohibited
+    sources:
+      - {page: 12, quote: "예금, 적금, 세금 납부, 보험료 납부, 국민연금 납부,"}
+      - {page: 8, quote: "예금/적금/연금/대출금 납입, 보험료 납부, 기프티콘 구입 등"}
+  - id: pension
+    names: [국민연금 납부, 연금 납입]
+    group: 자산 운영·축적 및 투자
+    verdict: prohibited
+    sources:
+      - {page: 12, quote: "국민연금 납부"}
+      - {page: 8, quote: "예금/적금/연금/대출금 납입"}
+  - id: insurance_payment
+    names: [보험료 납부]
+    aliases: [실손보험료, 자동차보험료, 생명보험료]
+    group: 자산 운영·축적 및 투자
+    verdict: prohibited
+    note: 건강보험료(health_insurance)는 사용 가능. 국민건강보험 외 보험은 불가.
+    sources:
+      - {page: 12, quote: "보험료 납부"}
+      - {page: 14, quote: "국민건강보험이 아닌 다른 보험은 불인정"}
+  - id: gift_card
+    names: [상품권(기프티콘 포함) 구매, 기프티콘 구입]
+    group: 자산 운영·축적 및 투자
+    verdict: prohibited
+    sources:
+      - {page: 12, quote: "상품권(기프티콘 포함) 구매"}
+  - id: prepaid_points
+    names: [결제 포인트 구매, 충전식 결제]
+    aliases: [페이 머니 충전, 토스 포인트 충전, 교통카드 충전]
+    group: 자산 운영·축적 및 투자
+    verdict: prohibited
+    sources:
+      - {page: 12, quote: "결제 포인트 구매, 충전식 결제"}
+  - id: credit_card_bill
+    names: [신용카드 대금 납부]
+    group: 자산 운영·축적 및 투자
+    verdict: prohibited
+    sources:
+      - {page: 12, quote: "신용카드 대금 납부"}
+  - id: general_loan
+    names: [일반대출 상환, 대출금 납입]
+    group: 자산 운영·축적 및 투자
+    verdict: prohibited
+    note: 주거 관련 대출·학자금대출은 가능(housing_loan, student_loan)
+    sources:
+      - {page: 12, quote: "일반대출 상환"}
+      - {page: 14, quote: "주거 관련 대출, 학자금대출 이외의 대출은 불인정"}
+  - id: investment
+    names: [기타 개인재산 형성 및 투자와 관련 있는 지출]
+    aliases: [주식, 코인, 펀드]
+    group: 자산 운영·축적 및 투자
+    verdict: prohibited
+    sources:
+      - {page: 12, quote: "기타 개인재산 형성 및 투자와 관련 있는 지출 등"}
+
+  # ---- 증빙이 어려운 항목 (8쪽 유의사항 7) ----
+  - id: hard_to_prove
+    names: [더치페이, 중고거래, 경조사비]
+    group: 증빙 곤란
+    verdict: prohibited
+    sources:
+      - {page: 8, quote: "증빙이 어려운 항목에 사용 불가 더치페이, 중고거래, 경조사비 등"}
+
+  # ---- 사회 정서에 반하는 지출 (12쪽, 8쪽 유의사항 8) ----
+  - id: gambling
+    names: [도박, 사행성 게임]
+    group: 사회 정서
+    verdict: prohibited
+    sources:
+      - {page: 12, quote: "도박·게임 등 사행성 분야에 대한 지출"}
+  - id: entertainment
+    names: [유흥비]
+    group: 사회 정서
+    verdict: prohibited
+    sources:
+      - {page: 12, quote: "유흥비"}
+  - id: luxury
+    names: [고가의 사치품, 고액의 서비스]
+    group: 사회 정서
+    verdict: prohibited
+    sources:
+      - {page: 12, quote: "진로 탐색 및 구직활동과 무관한 고가의 사치품 구매나 고액의 서비스 이용"}
+      - {page: 8, quote: "고가의 사치품, 단순 미용 목적 등"}
+  - id: cosmetic
+    names: [단순 미용 목적]
+    aliases: [피부과 시술, 성형, 레이저 토닝]
+    group: 사회 정서
+    verdict: prohibited
+    sources:
+      - {page: 8, quote: "고가의 사치품, 단순 미용 목적 등"}
+
+  # ---- 계좌 이용 (8쪽, 31쪽) ----
+  - id: carry_over
+    names: [이월]
+    group: 계좌 이용
+    verdict: conditional
+    condition: 자기성장기록서 이월사유란에 사유 작성 필수
+    sources:
+      - {page: 8, quote: "청년수당은 당월 사용이 원칙이나, 개인의 활동 계획에 따라 이월 가능."}
+      - {page: 8, quote: "이월한 경우, 자기성장기록서 - 이월사유란에 사유 작성 필수"}
+  - id: personal_deposit
+    names: [청년수당 통장에 개인 돈 추가 입금]
+    group: 계좌 이용
+    verdict: conditional
+    condition: 다른 계좌·제3자 계좌의 돈과 지원금을 합쳐서 쓰는 것은 금지
+    sources:
+      - {page: 31, quote: "가능합니다. 하지만 개인이 보유한 다른 계좌 또는 제3자 계좌의 돈과 청년수당 지원금을 합쳐서 사용하는 것은 금지입니다."}
+
+# 클린카드 사용 불가 업종 (12쪽 표, 48개). 이 업종 가맹점에서는 카드 결제가 막힌다.
+blocked_merchants:
+  verdict: prohibited
+  sources:
+    - {page: 12, quote: "클린카드 사용 불가 업종에 대한 지출 ◆ 호텔, 주점, 복권 판매, 피부미용, 마사지 등 48개 업종"}
+  names:
+    - 특별호텔
+    - 1급호텔
+    - 2급호텔
+    - 콘도미니엄
+    - 모텔, 여관, 기타숙박
+    - 면세점
+    - 주류판매(유통)
+    - 상품권판매
+    - 복권판매
+    - 농협(상품권)
+    - 룸싸롱
+    - 칵테일, 스텐드빠
+    - 극장식당
+    - 나이트클럽
+    - 카바레
+    - 단란주점
+    - 맥주홀
+    - 유흥주점
+    - 귀금속, 금, 은, 보석
+    - 자석요, 온돌매트, 옥매트
+    - 방문판매
+    - 다단계판매
+    - 실외골프장
+    - 노래방
+    - 비디오방/전화방
+    - 생명보험
+    - 손해보험
+    - 손해보험특종
+    - 손해보험장기(신규)
+    - 손해보험장기(기존)
+    - 손해보험자동차
+    - 총포류판매
+    - 카지노
+    - 전자오락실
+    - 성인용품판매점
+    - 피부미용실
+    - 안마업
+    - 스포츠마사지
+    - 학교등록금
+    - 유치원
+    - 중고차판매
+    - 신차판매
+    - 수입자동차
+    - 중장비판매, 수리
+    - 오토바이
+    - 보트판매
+    - 종교단체
+    - 무속, 철학관
