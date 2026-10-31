@@ -85,6 +85,7 @@ def run_meta(stage: str, cases_path: Path = CASES_PATH, **extra: Any) -> dict[st
         "cases": cases_path.name,
         "app_env": settings.app_env,
         "chat_model": settings.openai_chat_model,
+        "answer_model": settings.openai_answer_model or settings.openai_chat_model,
         "embedding_model": settings.openai_embedding_model,
         "blocker_check_model": settings.openai_blocker_check_model,
         "blocker_check_enabled": settings.blocker_check_enabled,
