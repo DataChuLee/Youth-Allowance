@@ -105,3 +105,11 @@ def test_score_source_evidence_checks_quotes_in_generation_sources() -> None:
     result = score_source_evidence(cases, answers, texts)
 
     assert result["overall"]["k"] == 1 and result["overall"]["n"] == 2
+
+
+def test_exact_mcnemar_is_symmetric_and_bounded() -> None:
+    from benchmarks.paired_eval_v1 import exact_mcnemar
+
+    assert exact_mcnemar(0, 0) == 1.0
+    assert exact_mcnemar(17, 3) == exact_mcnemar(3, 17)
+    assert round(exact_mcnemar(17, 3), 4) == 0.0026
