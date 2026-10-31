@@ -1,0 +1,118 @@
+# 청년수당 신청 자격·자격 상실 규칙 (2026 참여자 안내책자 7·9쪽)
+#
+# - requirements: 신청 자격 요건. 하나라도 맞지 않으면 신청 불가
+# - exclusions: 신청 제외 대상. exceptions에 해당하면 그 제외 사유는 적용되지 않는다
+# - loss_reasons: 참여 중 하나라도 생기면 자격 상실(즉시 신고)
+# - sources.quote 규칙은 spending.yaml과 같다.
+
+similar_programs:
+  names: [청년월세지원, 희망두배 청년 통장, 국민취업지원제도 1유형 및 2유형]
+  sources:
+    - {page: 7, quote: "서울시 청년월세지원 서울시 희망두배 청년 통장 고용노동부 국민취업지원제도 1유형 및 2유형"}
+
+requirements:
+  - id: age
+    names: [나이, 연령]
+    min_age: 19
+    max_age: 34
+    exceptions:
+      - id: veteran
+        names: [제대군인]
+        effect: 군 복무기간에 따라 최대 만 37세까지 신청 가능
+    sources:
+      - {page: 7, quote: "만 19~34세 - 단, 제대군인의 경우 군 복무기간에 따라 최대 만 37세까지 신청 가능"}
+  - id: residence
+    names: [거주지, 주소]
+    text: 신청일 기준 주민등록상 서울시 거주
+    sources:
+      - {page: 7, quote: "거주지 신청일 기준 주민등록상 서울시 거주"}
+  - id: income
+    names: [소득, 중위소득]
+    text: 2026년 2월 건강보험료 월 부과액 기준 중위소득 50% 초과 ~ 150% 이하
+    sources:
+      - {page: 7, quote: "2026년 2월 기준 중위소득 50% 초과 ~ 150% 이하 - 2026년 2월 건강보험료 월 부과액 기준"}
+  - id: employment
+    names: [미취업, 고용]
+    text: 미취업 상태
+    exceptions:
+      - id: short_term_worker
+        names: [단기근로자, 아르바이트]
+        effect: 주 30시간 이하 또는 3개월 이하 단기근로자는 근로계약서 제출 시 신청 가능
+    sources:
+      - {page: 7, quote: "미취업 상태 -단, 주 30시간 이하 또는 3개월 이하 단기근로자는 근로계약서 제출 시 신청 가능"}
+  - id: education
+    names: [학력, 졸업]
+    text: 최종학력 졸업(중퇴·제적·수료) 또는 졸업 예정
+    sources:
+      - {page: 7, quote: "최종학력 졸업(중퇴·제적·수료) 또는 졸업 예정"}
+
+exclusions:
+  - id: non_resident
+    names: [서울시 미거주자]
+    sources:
+      - {page: 7, quote: "1. 주민등록상 서울시 미거주자 (신청일 기준)"}
+  - id: student
+    names: [재학생, 휴학생, 대학원생]
+    exceptions:
+      - id: open_university
+        names: [방송통신대학, 사이버대학, 학점은행제]
+        effect: 신청 가능
+    sources:
+      - {page: 7, quote: "2. 재학생 및 휴학생 (단, 방송통신대학/사이버대학/학점은행제는 신청 가능)"}
+  - id: insured_worker
+    names: [고용보험에 가입된 3개월 초과 근로자, 주 30시간 초과 근로자]
+    sources:
+      - {page: 7, quote: "3. 고용보험에 가입된 3개월 초과 근로자 및 주 30시간 초과 근로자"}
+  - id: similar_program
+    names: [유사 사업 참여자]
+    note: 해당 사업은 similar_programs
+    sources:
+      - {page: 7, quote: "4. 유사 사업 참여자 (26년 3월 1일부터 사업 참여 종료일까지)"}
+  - id: past_participant
+    names: [2017~2025년 청년수당 사업참여자]
+    sources:
+      - {page: 7, quote: "5. 2017~2025년 청년수당 사업참여자 (생애 1회 지원)"}
+  - id: high_income
+    names: [중위소득 150% 초과 가구 청년]
+    sources:
+      - {page: 7, quote: "6. 중위소득 150% 초과 가구 청년"}
+  - id: basic_livelihood
+    names: [기초생활수급자, 차상위계층]
+    sources:
+      - {page: 7, quote: "7. 기초생활수급자 및 차상위계층(중위소득 50% 이하)"}
+  - id: unemployment_benefit
+    names: [실업급여 수급 중인 자]
+    sources:
+      - {page: 7, quote: "8. 실업급여 수급 중인 자 (청년수당 신청 시점부터 사업 참여 종료일까지)"}
+  - id: military
+    names: [군복무자, 사회복무요원]
+    sources:
+      - {page: 7, quote: "9. 군복무자 (사회복무요원 포함)"}
+
+loss_reasons:
+  - id: employment
+    names: [취업, 창업]
+    definition: 고용보험을 가입하였고, 근로 시간이 주30시간을 초과하면서 근로 기간이 3개월을 초과하는 근로
+    sources:
+      - {page: 9, quote: "취업 : 고용보험을 가입하였고, 근로 시간이 주30시간을 초과하면서 근로 기간이 3개월을 초과하는 근로를 하는 경우"}
+  - id: further_education
+    names: [진학, 대학원 진학]
+    exceptions:
+      - id: open_university
+        names: [방송통신대학, 사이버대학, 학점은행제]
+        effect: 자격 유지
+    sources:
+      - {page: 9, quote: "진학 (단, 방송통신대학/사이버대학/학점은행제 제외)"}
+  - id: relocation
+    names: [타 시도로 거주지 이전, 이사]
+    sources:
+      - {page: 9, quote: "타 시도로 거주지 이전"}
+  - id: enlistment
+    names: [입대]
+    sources:
+      - {page: 9, quote: "입대"}
+  - id: similar_program
+    names: [중복 참여 불가 사업 참여]
+    note: 해당 사업은 similar_programs
+    sources:
+      - {page: 9, quote: "중복 참여 불가 사업 참여"}
