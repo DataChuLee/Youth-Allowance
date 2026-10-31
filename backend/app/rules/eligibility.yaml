@@ -18,6 +18,7 @@ requirements:
     exceptions:
       - id: veteran
         names: [제대군인]
+        max_age: 37
         effect: 군 복무기간에 따라 최대 만 37세까지 신청 가능
     sources:
       - {page: 7, quote: "만 19~34세 - 단, 제대군인의 경우 군 복무기간에 따라 최대 만 37세까지 신청 가능"}
