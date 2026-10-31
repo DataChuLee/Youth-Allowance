@@ -10,6 +10,14 @@ from app.rag.prompts import ANSWER_SYSTEM_PROMPT, ANSWER_USER_PROMPT
 FOOD_DELIVERY_PLATFORM_TERMS = ("배민", "배달", "배달의민족", "음식배달", "음식 배달")
 
 
+def create_answer_llm(settings: Settings) -> ChatOpenAI:
+    """최종 답변용 LLM. 답변 모델만 바꿔 보는 비교 실험을 위해 질의 생성·평가 모델과 분리한다."""
+    model = settings.openai_answer_model or settings.openai_chat_model
+    # gpt-5 계열 추론 모델은 temperature=0을 받지 않아 기본값을 쓴다.
+    sampling = {} if model.startswith("gpt-5") else {"temperature": 0}
+    return ChatOpenAI(api_key=settings.openai_api_key, model=model, **sampling)
+
+
 def format_context(documents: list[Document]) -> str:
     return "\n\n".join(
         (
@@ -67,11 +75,7 @@ def generate_policy_context_answer(
     documents: list[Document],
     settings: Settings,
 ) -> str:
-    llm = ChatOpenAI(
-        api_key=settings.openai_api_key,
-        model=settings.openai_chat_model,
-        temperature=0,
-    )
+    llm = create_answer_llm(settings)
     messages = build_policy_context_messages(question, documents)
     response = llm.invoke(messages)
     return str(response.content).strip()
@@ -99,11 +103,7 @@ def stream_policy_context_answer(
     documents: list[Document],
     settings: Settings,
 ) -> Iterator[str]:
-    llm = ChatOpenAI(
-        api_key=settings.openai_api_key,
-        model=settings.openai_chat_model,
-        temperature=0,
-    )
+    llm = create_answer_llm(settings)
     yield from stream_chat_content(
         llm,
         build_policy_context_messages(question, documents),
@@ -111,11 +111,7 @@ def stream_policy_context_answer(
 
 
 def generate_pdf_answer(question: str, documents: list[Document], settings: Settings) -> str:
-    llm = ChatOpenAI(
-        api_key=settings.openai_api_key,
-        model=settings.openai_chat_model,
-        temperature=0,
-    )
+    llm = create_answer_llm(settings)
     messages = build_pdf_answer_messages(question, documents)
     response = llm.invoke(messages)
     return str(response.content).strip()
@@ -139,11 +135,7 @@ def stream_pdf_answer(
     documents: list[Document],
     settings: Settings,
 ) -> Iterator[str]:
-    llm = ChatOpenAI(
-        api_key=settings.openai_api_key,
-        model=settings.openai_chat_model,
-        temperature=0,
-    )
+    llm = create_answer_llm(settings)
     yield from stream_chat_content(llm, build_pdf_answer_messages(question, documents))
 
 
