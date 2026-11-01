@@ -56,3 +56,14 @@ def test_calendar_table_is_kept_whole() -> None:
 
 def test_chunking_is_deterministic() -> None:
     assert chunks_of(PAGE_12) == chunks_of(PAGE_12)
+
+
+def test_children_carry_parent_section_without_search_context() -> None:
+    chunks = chunk_pages([Document(page_content=PAGE_12, metadata={"page": 12})])
+    telecom = next(chunk for chunk in chunks if "통신비(소액결제 제외)" in chunk.page_content)
+    hotel = next(chunk for chunk in chunks if chunk.page_content.endswith("특별호텔"))
+    jewelry = next(chunk for chunk in chunks if chunk.page_content.endswith("귀금속, 금, 은, 보석"))
+    # 업종 항목은 같은 부모(업종 목록 전체)를 공유하고, 사용 가능 표와는 다른 부모다.
+    assert hotel.metadata["parent_id"] == jewelry.metadata["parent_id"] != telecom.metadata["parent_id"]
+    assert "특별호텔, 1급호텔, 귀금속, 금, 은, 보석" in jewelry.metadata["parent_text"]
+    assert "| 기타 | 문화 관람비 |" in telecom.metadata["parent_text"]
