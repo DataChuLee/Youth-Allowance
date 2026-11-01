@@ -30,10 +30,11 @@ BENCHMARK_DIR = Path(__file__).resolve().parent
 CASES_PATH = BENCHMARK_DIR / "datasets" / "eval_test_v1.jsonl"
 RESULTS_DIR = BENCHMARK_DIR / "results"
 BASELINE_CHUNKS_SHA256 = "8fc01b77bf3db6254657f6bf176922aee4130d1913854a21eaaad2cc7768a49d"
-# 측정을 허용하는 인덱스. 실험 인덱스는 기준선 청크에서 한 가지만 바꿔 만든 것만 등록한다.
+# 측정을 허용하는 인덱스. 실험 인덱스는 청커 하나만 바꿔 만든 것만 등록한다(structured_v1: 실험 8).
 KNOWN_INDEXES = {
     BASELINE_CHUNKS_SHA256: "baseline_18fec50",
     "92ec3482d081366f477bd7adcb0f939bd68a739b787902e25d656135e7d324d3": "table_split",
+    "9bba73e222e346d173cc301661d6b99e1bac1186f9adb93653c4fd9af689a8f9": "structured_v1",
 }
 JUDGE_MODEL = "gpt-4.1-2025-04-14"
 SAMPLE_SIZE = 30
