@@ -17,15 +17,18 @@ from langchain_core.documents import Document
 
 CHUNKER_CONFIG = {
     "type": "structured",
-    "version": 1,
+    "version": 2,
     "max_chars": 500,
     "min_text_chars": 10,
     "table_context_chars": 150,
+    "parent_max_chars": 1200,
 }
 MAX_CHUNK_CHARS = CHUNKER_CONFIG["max_chars"]
 # 이보다 짧은 본문 조각("6 월", "질문")은 쪽 제목이나 다음 표의 맥락으로 이미 들어가므로 버린다.
 MIN_TEXT_CHARS = CHUNKER_CONFIG["min_text_chars"]
 TABLE_CONTEXT_CHARS = CHUNKER_CONFIG["table_context_chars"]
+# 답변 모델에 넘기는 부모 절의 최대 길이. 기준선 최대 청크(1,750자)보다 작게 둔다.
+PARENT_MAX_CHARS = CHUNKER_CONFIG["parent_max_chars"]
 # 쪽 머리의 장·절 제목은 OCR에서 짧은 줄 여러 개로 쪼개져 나온다(예: "3.현금", "사용", "(계좌이체)").
 TITLE_LINE_MAX_CHARS = 12
 # 7칸 이상 표는 달력이다. 행 단위로 자르면 날짜만 남으므로 통째로 둔다.
@@ -173,28 +176,62 @@ def text_pieces(lines: list[str]) -> list[str]:
     return pack([piece.strip() for piece in pieces if piece.strip()])
 
 
+def block_text(kind: str, block: list[str]) -> str:
+    """부모 절에 넣을 원문. 검색용 맥락 문장은 붙이지 않는다(실험 8: 행에 붙인 '…불가' 맥락을 모델이 오독)."""
+    if kind == "text":
+        return " ".join(" ".join(block).replace(" # ", " ").split()).lstrip("# ")
+    rows = [row for row in block if any(row_cells(row)) and not _TABLE_SEPARATOR.match(row)]
+    items = numbered_items(rows)
+    return ", ".join(items) if items is not None else "\n".join(rows)
+
+
+def group_sections(blocks: list[tuple[str, list[str]]]) -> list[list[tuple[str, list[str]]]]:
+    """본문 블록과 그 뒤에 이어지는 표들을 한 절로 묶는다. 표는 바로 앞 문장이 제목 역할을 한다."""
+    sections: list[list[tuple[str, list[str]]]] = []
+    for kind, block in blocks:
+        if kind == "text" or not sections:
+            sections.append([])
+        sections[-1].append((kind, block))
+    return sections
+
+
+def block_chunks(kind: str, block: list[str], previous_text: str) -> list[str]:
+    if kind == "text":
+        return [piece for piece in text_pieces(block) if len(piece) >= MIN_TEXT_CHARS]
+    # FAQ 표(Q5 | …)는 질문이 곧 맥락이라 앞 답변 문장을 붙이지 않는다.
+    is_faq = re.match(r"Q\d+$", row_cells(block[0])[0]) is not None
+    context = "" if is_faq else table_context(previous_text)
+    return [f"{context}\n{piece}" if context else piece for piece in table_pieces(block)]
+
+
 def chunk_page(page: Document) -> list[Document]:
+    """작은 청크(검색용)마다 부모 절(답변용) 원문을 붙인다.
+
+    부모 절은 '본문 + 이어지는 표'이고 PARENT_MAX_CHARS를 넘으면 블록 하나로 줄인다.
+    블록 하나도 넘으면 부모 없이 작은 청크 그대로 쓴다(예전 12쪽 1,361자처럼 가능·불가가 섞이지 않게).
+    """
     lines = [clean_line(line) for line in page.page_content.split("\n")]
     title, body = split_title([line for line in lines if line.strip()])
     page_number = page.metadata["page"]
     header = f"[{page_number}쪽 {title}]".replace(" ]", "]")
     chunks: list[Document] = []
-    previous_text = ""
-    for kind, block in split_blocks(body):
-        if kind == "text":
-            previous_text = "\n".join(block)
-            bodies = [piece for piece in text_pieces(block) if len(piece) >= MIN_TEXT_CHARS]
-        else:
-            # FAQ 표(Q5 | …)는 질문이 곧 맥락이라 앞 답변 문장을 붙이지 않는다.
-            is_faq = re.match(r"Q\d+$", row_cells(block[0])[0]) is not None
-            context = "" if is_faq else table_context(previous_text)
-            bodies = [f"{context}\n{piece}" if context else piece for piece in table_pieces(block)]
-            # 표가 연달아 나오면 다음 표에 같은 앞 문장을 다시 붙이지 않는다.
-            previous_text = ""
-        chunks.extend(
-            Document(page_content=f"{header}\n{text}", metadata={"page": page_number, "section": title})
-            for text in bodies
-        )
+    for section_index, section in enumerate(group_sections(split_blocks(body))):
+        section_text = "\n".join(block_text(kind, block) for kind, block in section)
+        previous_text = ""
+        for block_index, (kind, block) in enumerate(section):
+            text = block_text(kind, block)
+            if len(section_text) <= PARENT_MAX_CHARS:
+                parent = (f"p{page_number:02d}_s{section_index}", section_text)
+            elif len(text) <= PARENT_MAX_CHARS:
+                parent = (f"p{page_number:02d}_s{section_index}_b{block_index}", text)
+            else:
+                parent = None
+            for body_text in block_chunks(kind, block, previous_text):
+                metadata = {"page": page_number, "section": title}
+                if parent:
+                    metadata |= {"parent_id": parent[0], "parent_text": f"{header}\n{parent[1]}"}
+                chunks.append(Document(page_content=f"{header}\n{body_text}", metadata=metadata))
+            previous_text = "\n".join(block) if kind == "text" else ""
     return chunks
 
 
