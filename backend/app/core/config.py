@@ -12,6 +12,7 @@ DEFAULT_ENV_FILE = PROJECT_ROOT / ".env"
 DEFAULT_OPENAI_CHAT_MODEL = "gpt-4o-mini"
 DEFAULT_OPENAI_EMBEDDING_MODEL = "text-embedding-3-large"
 DEFAULT_OPENAI_BLOCKER_CHECK_MODEL = "gpt-4.1-mini-2025-04-14"
+DEFAULT_OPENAI_RULE_MAPPER_MODEL = "gpt-4.1-mini-2025-04-14"
 
 
 class Settings(BaseSettings):
@@ -28,6 +29,10 @@ class Settings(BaseSettings):
     # 키워드 차단 확인은 gpt-4o-mini가 개발셋 42문항 중 6개를 틀려 더 강한 모델을 따로 쓴다.
     openai_blocker_check_model: str = Field(
         default=DEFAULT_OPENAI_BLOCKER_CHECK_MODEL, alias="OPENAI_BLOCKER_CHECK_MODEL"
+    )
+    # 규칙 연결기는 gpt-4o-mini가 개발셋에서 예외·업종을 잘못 붙여 허용 쪽으로 틀려 더 강한 모델을 쓴다.
+    openai_rule_mapper_model: str = Field(
+        default=DEFAULT_OPENAI_RULE_MAPPER_MODEL, alias="OPENAI_RULE_MAPPER_MODEL"
     )
     # false면 확인 없이 키워드만으로 차단한다(기준선 재현·비교 실험용).
     blocker_check_enabled: bool = Field(default=True, alias="BLOCKER_CHECK_ENABLED")
