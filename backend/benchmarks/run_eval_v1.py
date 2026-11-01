@@ -89,6 +89,8 @@ def run_meta(stage: str, cases_path: Path = CASES_PATH, **extra: Any) -> dict[st
         "embedding_model": settings.openai_embedding_model,
         "blocker_check_model": settings.openai_blocker_check_model,
         "blocker_check_enabled": settings.blocker_check_enabled,
+        "rules_enabled": settings.rules_enabled,
+        "rule_mapper_model": settings.openai_rule_mapper_model,
         **extra,
     }
 
