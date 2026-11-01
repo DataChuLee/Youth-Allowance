@@ -195,3 +195,60 @@ def test_run_chat_graph_uses_request_history_without_persisting_it() -> None:
 
     assert "청년수당 카드가 뭐야?" in generated_questions[0]
     assert "[이전 대화]" not in generated_questions[1]
+
+
+def _rag_document_retriever(calls: list[str]):
+    document = Document(
+        page_content="청년수당 카드는 진로탐색 및 구직활동 비용에 사용할 수 있습니다.",
+        metadata={"page": 12, "chunk_id": "pdf-page-12-chunk-0", "title": "청년수당 참여자 안내책자"},
+    )
+
+    def fake_retrieve(question: str) -> list[RetrievedDocument]:
+        calls.append(question)
+        return [RetrievedDocument(document=document, score=0.95)]
+
+    return fake_retrieve
+
+
+def test_run_chat_graph_answers_from_rule_without_retrieval_when_rule_matches() -> None:
+    from app.rules.mapper import RuleMatch
+
+    calls: list[str] = []
+    response = run_chat_graph(
+        "국민연금 청년수당으로 내도 돼요?",
+        retrieve_documents=_rag_document_retriever(calls),
+        generate_answer=lambda question, documents: "RAG 답변",
+        map_rules=lambda question: RuleMatch(domain="spending", rule_id="pension"),
+    )
+
+    assert calls == []
+    assert response.status == "blocked_by_policy"
+    assert response.answer.startswith("안내책자 기준으로 불가합니다.")
+    assert response.sources[0].chunk_id == "rule:pension"
+    assert response.sources[0].page == 12
+
+
+def test_run_chat_graph_falls_back_to_rag_when_rule_is_unclear_or_mapper_fails() -> None:
+    from app.rules.mapper import RuleMatch
+
+    def failing_mapper(question: str) -> RuleMatch:
+        raise RuntimeError("mapper down")
+
+    for mapper in (lambda question: RuleMatch(domain="none"), failing_mapper):
+        calls: list[str] = []
+        response = run_chat_graph(
+            "청년수당 카드는 어디에 쓸 수 있어?",
+            retrieve_documents=_rag_document_retriever(calls),
+            generate_answer=lambda question, documents: "RAG 답변",
+            map_rules=mapper,
+        )
+        assert calls and response.answer == "RAG 답변"
+
+
+def test_rule_answer_states_conditions_and_other_requirements_for_eligibility() -> None:
+    from app.rules.answer import build_rule_answer
+    from app.rules.handlers import check_eligibility
+
+    answer = build_rule_answer(check_eligibility("requirements", "age", "veteran", 36), "eligibility")
+    assert answer.startswith("안내책자 기준으로 조건부로 가능합니다.")
+    assert "37세" in answer and "다른 신청 요건" in answer
