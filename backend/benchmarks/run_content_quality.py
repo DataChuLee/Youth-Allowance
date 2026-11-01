@@ -43,11 +43,18 @@ def load_chunk_texts(settings: Settings) -> dict[str, str]:
         NoopEmbeddings(),
     )
     documents = getattr(store.docstore, "_dict", {}).values()
-    return {
+    texts = {
         str(document.metadata["chunk_id"]): str(document.page_content)
         for document in documents
         if getattr(document, "metadata", {}).get("chunk_id") and getattr(document, "page_content", "")
     }
+    # 부모 절 인덱스(실험 8b)는 답변 출처가 부모 ID라서 부모 원문도 함께 돌려준다.
+    texts |= {
+        str(document.metadata["parent_id"]): str(document.metadata["parent_text"])
+        for document in documents
+        if getattr(document, "metadata", {}).get("parent_id")
+    }
+    return texts
 
 
 async def create_ragas_metrics(settings: Settings):
