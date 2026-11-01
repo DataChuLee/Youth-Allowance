@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     )
     # false면 확인 없이 키워드만으로 차단한다(기준선 재현·비교 실험용).
     blocker_check_enabled: bool = Field(default=True, alias="BLOCKER_CHECK_ENABLED")
+    # true면 판정 질문을 규칙 계층(app/rules)이 먼저 처리한다. 측정 전까지 기본값은 기존 RAG 경로다.
+    rules_enabled: bool = Field(default=False, alias="RULES_ENABLED")
     ocr_jsonl_path: Path = Field(default=DEFAULT_OCR_JSONL_PATH, alias="OCR_JSONL_PATH")
     faiss_index_dir: Path = Field(default=DEFAULT_FAISS_INDEX_DIR, alias="FAISS_INDEX_DIR")
     langsmith_tracing: bool = Field(default=False, alias="LANGSMITH_TRACING")
