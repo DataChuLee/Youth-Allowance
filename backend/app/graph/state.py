@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 from langchain_core.documents import Document
 from pydantic import BaseModel, Field
@@ -55,6 +55,9 @@ class GraphState(BaseModel):
         "blocked_by_policy",
     ] = "insufficient_pdf_evidence"
     needs_external_search: bool = True
+    # 규칙 계층이 결론을 냈을 때만 채운다(app.rules.handlers.RuleVerdict). None이면 RAG 경로로 간다.
+    rule_verdict: Any = None
+    rule_domain: str = ""
     # 요청에 포함된 최근 대화 문맥이며 그래프 실행이 끝나면 폐기한다.
     messages: list[dict] = Field(default_factory=list)
 

@@ -31,6 +31,8 @@ from app.rag.retrieval import (
     retrieve_with_queries,
 )
 from app.rag.sources import document_to_source
+from app.rules.answer import build_rule_answer, rule_sources
+from app.rules.mapper import RuleMatch, create_rule_mapper, resolve_match
 
 DEFAULT_MIN_SIMILARITY_SCORE = 0.2
 
@@ -57,6 +59,7 @@ def _score_lookup(state: GraphState) -> dict[str, float]:
 
 
 PlanSearchQueries = Callable[[str], list[str]]
+MapRules = Callable[[str], RuleMatch]
 GenerateAnswer = Callable[[str, list[Document]], str]
 GeneratePolicyAnswer = Callable[[str, list[Document]], str]
 IntentRouteName = Literal["general_answer", "rag"]
@@ -81,6 +84,7 @@ class ChatGraphDependencies:
     settings: Settings
     use_query_expansion: bool
     use_policy_context_generation: bool
+    map_rules: MapRules | None = None
 
 
 @dataclass(frozen=True)
@@ -184,6 +188,42 @@ def general_answer_node() -> Callable[[GraphState], GraphState]:
         state.status = "general_answer"
         state.needs_external_search = False
         state.intent = "general_answer"
+        state.messages = state.messages + [
+            {"role": "user", "content": state.question},
+            {"role": "assistant", "content": state.answer},
+        ]
+        return state
+
+    return node
+
+
+def resolve_rules_node(map_rules: MapRules) -> Callable[[GraphState], GraphState]:
+    def node(state: GraphState) -> GraphState:
+        try:
+            match = map_rules(state.question)
+            verdict = resolve_match(match)
+        except Exception:
+            # 규칙 연결은 판정 정확도를 높이는 단계라 실패하면 기존 RAG 경로로 답한다.
+            return state
+        if verdict.verdict != "unclear":
+            state.rule_verdict = verdict
+            state.rule_domain = match.domain
+        return state
+
+    return node
+
+
+def route_rules(state: GraphState) -> Literal["rule", "rag"]:
+    return "rule" if state.rule_verdict is not None else "rag"
+
+
+def generate_rule_answer_node() -> Callable[[GraphState], GraphState]:
+    def node(state: GraphState) -> GraphState:
+        verdict = state.rule_verdict
+        state.answer = build_rule_answer(verdict, state.rule_domain)
+        state.sources = rule_sources(verdict)
+        state.status = "blocked_by_policy" if verdict.verdict == "prohibited" else "answered_from_pdf"
+        state.needs_external_search = False
         state.messages = state.messages + [
             {"role": "user", "content": state.question},
             {"role": "assistant", "content": state.answer},
@@ -370,6 +410,7 @@ def build_chat_graph(
     use_query_expansion: bool = True,
     use_policy_context_generation: bool = True,
     confirm_blockers: ConfirmBlockers | None = None,
+    map_rules: MapRules | None = None,
 ):
     graph = StateGraph(GraphState)
     graph.add_node("classify_intent", classify_intent_node(classify_intent))
@@ -402,9 +443,17 @@ def build_chat_graph(
         route_intent,
         {
             "general_answer": "general_answer",
-            "rag": "plan_queries",
+            "rag": "resolve_rules" if map_rules else "plan_queries",
         },
     )
+    if map_rules:
+        # 판정 규칙에 걸리면 결정적 결론으로 답하고, 아니면 기존 RAG 경로로 간다.
+        graph.add_node("resolve_rules", resolve_rules_node(map_rules))
+        graph.add_node("generate_rule_answer", generate_rule_answer_node())
+        graph.add_conditional_edges(
+            "resolve_rules", route_rules, {"rule": "generate_rule_answer", "rag": "plan_queries"}
+        )
+        graph.add_edge("generate_rule_answer", END)
     graph.add_edge("general_answer", END)
     graph.add_edge("plan_queries", "retrieve_pdf")
     graph.add_edge("retrieve_pdf", "resolve_policy_precheck")
@@ -443,6 +492,7 @@ def resolve_chat_graph_dependencies(
     generate_answer: GenerateAnswer | None = None,
     generate_policy_answer: GeneratePolicyAnswer | None = None,
     settings: Settings | None = None,
+    map_rules: MapRules | None = None,
 ) -> ChatGraphDependencies:
     resolved_settings = settings or get_settings()
     if classify_intent is not None:
@@ -499,7 +549,15 @@ def resolve_chat_graph_dependencies(
         retrieve_documents is None and resolved_settings.app_env != "test"
     )
 
+    if map_rules is not None:
+        resolved_map_rules = map_rules
+    elif resolved_settings.rules_enabled and resolved_settings.app_env != "test" and retrieve_documents is None:
+        resolved_map_rules = create_rule_mapper(resolved_settings)
+    else:
+        resolved_map_rules = None
+
     return ChatGraphDependencies(
+        map_rules=resolved_map_rules,
         classify_intent=resolved_classify_intent,
         plan_search_queries=resolved_plan_search_queries,
         retrieve_documents=resolved_retrieve_documents,
@@ -523,6 +581,7 @@ def run_chat_graph(
     generate_answer: GenerateAnswer | None = None,
     generate_policy_answer: GeneratePolicyAnswer | None = None,
     settings: Settings | None = None,
+    map_rules: MapRules | None = None,
     thread_id: str | None = None,
     history: list[dict[str, str]] | None = None,
 ) -> ChatResponse:
@@ -536,6 +595,7 @@ def run_chat_graph(
         generate_answer=generate_answer,
         generate_policy_answer=generate_policy_answer,
         settings=settings,
+        map_rules=map_rules,
     )
     graph = build_chat_graph(
         classify_intent=dependencies.classify_intent,
@@ -548,6 +608,7 @@ def run_chat_graph(
         use_query_expansion=dependencies.use_query_expansion,
         use_policy_context_generation=dependencies.use_policy_context_generation,
         confirm_blockers=dependencies.confirm_blockers,
+        map_rules=dependencies.map_rules,
     )
     # thread_id는 요청 상관관계 식별자로만 받고 서버 상태 저장에는 사용하지 않는다.
     _ = thread_id
@@ -573,6 +634,7 @@ def prepare_chat_stream(
     generate_answer: GenerateAnswer | None = None,
     generate_policy_answer: GeneratePolicyAnswer | None = None,
     settings: Settings | None = None,
+    map_rules: MapRules | None = None,
     thread_id: str | None = None,
     history: list[dict[str, str]] | None = None,
 ) -> PreparedChatStream:
@@ -586,6 +648,7 @@ def prepare_chat_stream(
         generate_answer=generate_answer,
         generate_policy_answer=generate_policy_answer,
         settings=settings,
+        map_rules=map_rules,
     )
     captured: dict[str, object] = {}
 
@@ -615,6 +678,7 @@ def prepare_chat_stream(
         use_query_expansion=dependencies.use_query_expansion,
         use_policy_context_generation=dependencies.use_policy_context_generation,
         confirm_blockers=dependencies.confirm_blockers,
+        map_rules=dependencies.map_rules,
     )
     _ = thread_id
     recent_history = list(history or [])[-4:]
