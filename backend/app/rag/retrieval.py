@@ -169,6 +169,18 @@ class HybridRRFRetriever:
         )[: self.top_k]
 
 
+def expand_to_parent(item: RetrievedDocument) -> RetrievedDocument:
+    """검색된 작은 청크를 답변용 부모 절 원문으로 바꾼다. chunk_id는 부모 ID가 된다."""
+    metadata = item.document.metadata
+    if not metadata.get("parent_id"):
+        return item
+    parent_metadata = {key: value for key, value in metadata.items() if key != "parent_text"}
+    parent_metadata |= {"chunk_id": metadata["parent_id"], "matched_chunk_id": metadata.get("chunk_id")}
+    return item.model_copy(
+        update={"document": Document(page_content=metadata["parent_text"], metadata=parent_metadata)}
+    )
+
+
 def retrieve_with_queries(
     question: str,
     search_queries: list[str],
@@ -203,7 +215,9 @@ def retrieve_with_queries(
 
     deduped: list[RetrievedDocument] = []
     seen: set[str] = set()
-    for item in interleaved:
+    # 작게 찾고 크게 읽기: 부모 절이 있는 청크는 부모로 바꾸고, 같은 부모는 하나로 합친 뒤 max_docs를 자른다.
+    # 먼저 합쳐야 업종 48개 같은 작은 형제 청크가 상위 자리를 다 차지하지 않는다. 부모가 없는 인덱스는 그대로다.
+    for item in (expand_to_parent(item) for item in interleaved):
         key = str(item.document.metadata.get("chunk_id") or item.document.page_content)
         if key in seen:
             continue
